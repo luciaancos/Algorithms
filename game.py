@@ -1,3 +1,5 @@
+import random
+
 from enum import Enum, auto
 from typing import Optional
 
@@ -181,7 +183,54 @@ class Board:
 
         return table
 
+class GameMode(Enum):
+    PLACE = auto()
+    MOVE = auto()
+    DELETE = auto()
+
+class Turn(Enum):
+    WHITE = 1
+    BLACK = 2
+
+class MillGame:
+    """ This class encodes the game logic """
+    
+    def __init__(self, turn: Optional[Turn]=None):
+        """ turn is the one who starts. If None is given, it is chosen randomly """
+
+        self.turn = turn if self.turn is not None else Turn(random.randint(1, 2))
+        self.mode = GameMode.PLACE
+        self.board = Board()
+
+    def place(self, ring: int, cell: int) -> bool:
+        if self.mode != GameMode.PLACE or self.board.get_cell(ring, cell) != CellState.EMPTY:
+            return False
+
+        self.board.put_cell(ring, cell, self._get_state_by_turn())
+
+        return True
+
+    def _get_state_by_turn(self) -> CellState:
+        return CellState.BLACK if self.turn == Turn.BLACK else CellState.WHITE
+
+
+class State:
+    pass
+
 if __name__ == "__main__":
     tablero = Board()
     print(tablero)
-    
+
+    # game = MillGame(turn=, )
+
+    # game.place(ring, cell) -> bool
+    # game.place(ring, cell)
+
+    # # Si se llama a un método distinto a los que permite el modo en el que se encuentra
+    # # el juego, crashe
+    # game.remove(ring, cell) -> Indicar la razon del fallo
+
+    # game.move(ring1, cell1, ring2, cell2) -> Indicar la razon del fallo
+
+
+    # game.mode
