@@ -137,49 +137,41 @@ class Board:
 
         return ring * CELLS_PER_RING + cell
 
-    def print_state(self, state: CellState):
-        if state == CellState.EMPTY:
-            return 'O'
-        elif state == CellState.BLACK:
-            return 'B'
-        else:
-            return 'W'
 
     def __str__(self):
         table = (self.buff[0].print_state() + '----------------' +
-        self.print_state(self.buff[1]) + '----------------' +
-        self.print_state(self.buff[2]) + '\n')
-
-        table += ('|                |                |\n' +
-          '|                |                |\n' +
-          '|      ' + self.print_state(self.buff[8]) + '---------' +
-          self.print_state(self.buff[9]) + '---------' +
-          self.print_state(self.buff[10]) + '      |\n' +
-          '|      |         |         |      |\n' +
-          '|      |         |         |      |\n' +
-          '|      |    ' + self.print_state(self.buff[16]) + '----' +
-          self.print_state(self.buff[17]) + '----' +
-          self.print_state(self.buff[18]) + '    |      |\n' +
-          '|      |    |         |    |      |\n' +
-          self.print_state(self.buff[7]) + '      ' +
-          self.print_state(self.buff[15]) + '    ' + self.print_state(self.buff[23]) +
-          '         ' + self.print_state(self.buff[19]) +
-          '    ' + self.print_state(self.buff[11]) + '      ' +
-          self.print_state(self.buff[3]) + '\n' +
-          '|      |    |         |    |      |\n' +
-          '|      |    ' + self.print_state(self.buff[22]) + '----' +
-          self.print_state(self.buff[21]) + '----' +
-          self.print_state(self.buff[20]) + '    |      |\n' +
-          '|      |         |         |      |\n' +
-          '|      |         |         |      |\n' +
-          '|      ' + self.print_state(self.buff[14]) + '---------' +
-          self.print_state(self.buff[13]) + '---------' +
-          self.print_state(self.buff[12]) + '      |\n')
-        table += ('|                |                |\n' +
-          '|                |                |\n' +
-          self.print_state(self.buff[6]) + '----------------' +
-          self.print_state(self.buff[5]) + '----------------' +
-          self.print_state(self.buff[4]) + '\n')
+        self.buff[1].print_state() + '----------------' +
+        self.buff[2].print_state() + '\n')
+        table += ('|                |                |\n') 
+        table += ('|                |                |\n')
+        table += ('|      ' + self.buff[8].print_state() + 
+        '---------' + self.buff[9].print_state() + '---------' +
+        self.buff[10].print_state() + '      |\n') 
+        table += ('|      |         |         |      |\n')
+        table += ('|      |         |         |      |\n')
+        table += ('|      |    ' + self.buff[16].print_state() + 
+        '----' + self.buff[17].print_state() + '----' +
+        self.buff[18].print_state() + '    |      |\n')
+        table += ('|      |    |         |    |      |\n')
+        table += (self.buff[7].print_state() + '      ' +
+        self.buff[15].print_state() + '    ' + self.buff[23].print_state() +
+        '         ' + self.buff[19].print_state() +
+        '    ' + self.buff[11].print_state() + '      ' +
+        self.buff[3].print_state() + '\n')
+        table+= ('|      |    |         |    |      |\n')
+        table += ('|      |    ' + self.buff[22].print_state() + '----' +
+        self.buff[21].print_state() + '----' +
+        self.buff[20].print_state() + '    |      |\n') 
+        table+= ('|      |         |         |      |\n')
+        table+= ('|      |         |         |      |\n')
+        table += ('|      ' + self.buff[14].print_state() + '---------' +
+        self.buff[13].print_state() + '---------' +
+        self.buff[12].print_state() + '      |\n')
+        table += ('|                |                |\n') 
+        table += ('|                |                |\n') 
+        table += (self.buff[6].print_state() + '----------------' +
+        self.buff[5].print_state() + '----------------' +
+        self.buff[4].print_state() + '\n')
 
         return table
 
