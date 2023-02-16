@@ -11,6 +11,14 @@ class CellState(Enum):
     BLACK = auto()
     EMPTY = auto()
 
+    def print_state(self) -> str:
+        match self:
+            case CellState.EMPTY:
+                return 'O'
+            case CellState.BLACK:
+                return 'B'
+            case _:
+                return 'W'
 
 class Board:
     """ It represents the standard board for the "Nine men's morris" game. It contains
@@ -136,9 +144,10 @@ class Board:
             return 'W'
 
     def __str__(self):
-        table = (self.print_state(self.buff[0]) + '----------------' +
-         self.print_state(self.buff[1]) + '----------------' +
-         self.print_state(self.buff[2]) + '\n')
+        table = (self.buff[0].print_state() + '----------------' +
+        self.print_state(self.buff[1]) + '----------------' +
+        self.print_state(self.buff[2]) + '\n')
+
         table += ('|                |                |\n' +
           '|                |                |\n' +
           '|      ' + self.print_state(self.buff[8]) + '---------' +
