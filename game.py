@@ -218,11 +218,12 @@ class MillGame:
         if self.board.get_cell(ring2, cell2) != CellState.EMPTY:
             raise ValueError(
                 "The new position of the chip must be empty")
-        if self.board.is_mill(ring2,cell2):
-            self.mode = GameMode.DELETE
         
         self.board.remove(ring1, cell1)
         self.board.put_cell(ring2, cell2, self._get_state_by_turn())
+
+        if self.board.is_mill(ring2,cell2):
+            self.mode = GameMode.DELETE
 
 class State:
     pass
