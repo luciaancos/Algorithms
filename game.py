@@ -126,3 +126,53 @@ class Board:
                 f"The cell must be between 0 and {CELLS_PER_RING}, but {cell} was given")
 
         return ring * CELLS_PER_RING + cell
+
+    def print_state(self, state: CellState):
+        if state == CellState.EMPTY:
+            return 'O'
+        elif state == CellState.BLACK:
+            return 'B'
+        else:
+            return 'W'
+
+    def __str__(self):
+        table = (self.print_state(self.buff[0]) + '----------------' +
+         self.print_state(self.buff[1]) + '----------------' +
+         self.print_state(self.buff[2]) + '\n')
+        table += ('|                |                |\n' +
+          '|                |                |\n' +
+          '|      ' + self.print_state(self.buff[8]) + '---------' +
+          self.print_state(self.buff[9]) + '---------' +
+          self.print_state(self.buff[10]) + '      |\n' +
+          '|      |         |         |      |\n' +
+          '|      |         |         |      |\n' +
+          '|      |    ' + self.print_state(self.buff[16]) + '----' +
+          self.print_state(self.buff[17]) + '----' +
+          self.print_state(self.buff[18]) + '    |      |\n' +
+          '|      |    |         |    |      |\n' +
+          self.print_state(self.buff[7]) + '      ' +
+          self.print_state(self.buff[15]) + '    ' + self.print_state(self.buff[23]) +
+          '         ' + self.print_state(self.buff[19]) +
+          '    ' + self.print_state(self.buff[11]) + '      ' +
+          self.print_state(self.buff[3]) + '\n' +
+          '|      |    |         |    |      |\n' +
+          '|      |    ' + self.print_state(self.buff[22]) + '----' +
+          self.print_state(self.buff[21]) + '----' +
+          self.print_state(self.buff[20]) + '    |      |\n' +
+          '|      |         |         |      |\n' +
+          '|      |         |         |      |\n' +
+          '|      ' + self.print_state(self.buff[14]) + '---------' +
+          self.print_state(self.buff[13]) + '---------' +
+          self.print_state(self.buff[12]) + '      |\n')
+        table += ('|                |                |\n' +
+          '|                |                |\n' +
+          self.print_state(self.buff[6]) + '----------------' +
+          self.print_state(self.buff[5]) + '----------------' +
+          self.print_state(self.buff[4]) + '\n')
+
+        return table
+
+if __name__ == "__main__":
+    tablero = Board()
+    print(tablero)
+    
