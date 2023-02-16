@@ -13,7 +13,7 @@ class CellState(Enum):
     BLACK = auto()
     EMPTY = auto()
 
-    def print_state(self) -> str:
+    def __str__(self) -> str:
         match self:
             case CellState.EMPTY:
                 return 'O'
@@ -21,6 +21,7 @@ class CellState(Enum):
                 return 'B'
             case _:
                 return 'W'
+
 
 class Board:
     """ It represents the standard board for the "Nine men's morris" game. It contains
@@ -30,7 +31,7 @@ class Board:
     the cell to the right of cell zero is one and so on until the last one, which is seven. 
     """
 
-    def __init__(self, buff: Optional[list[CellState]]=None):
+    def __init__(self, buff: Optional[list[CellState]] = None):
         """ buff is a 24 sized list which represents the board. If None is given, an empty board will be generated"""
 
         self.buff = buff if buff is not None else [CellState.EMPTY] * BOARD_SIZE
@@ -88,9 +89,8 @@ class Board:
         if current_state == CellState.EMPTY:
             return False
 
-
         if self.is_intersection(ring, cell):
-            # if it is not one of the corners, the mill can be created with other pieces in the same ring 
+            # if it is not one of the corners, the mill can be created with other pieces in the same ring
             if self._check_same_in_ring(current_state, ring, cell - 1):
                 return True
 
@@ -102,7 +102,7 @@ class Board:
                 self._check_same_in_ring(current_state, ring, cell + 6):
             # if it is a corner, we have to check for two possible mills
             return True
-        
+
         return False
 
     def _check_same_in_ring(self, check_state: CellState, ring, cell) -> bool:
@@ -125,7 +125,6 @@ class Board:
 
         return True
 
-
     def _get_cell_idx(self, ring: int, cell: int):
         if ring < 0 or ring >= RINGS:
             raise ValueError(
@@ -137,58 +136,67 @@ class Board:
 
         return ring * CELLS_PER_RING + cell
 
-
     def __str__(self):
-        table = (self.buff[0].print_state() + '----------------' +
-        self.buff[1].print_state() + '----------------' +
-        self.buff[2].print_state() + '\n')
-        table += ('|                |                |\n') 
-        table += ('|                |                |\n')
-        table += ('|      ' + self.buff[8].print_state() + 
-        '---------' + self.buff[9].print_state() + '---------' +
-        self.buff[10].print_state() + '      |\n') 
-        table += ('|      |         |         |      |\n')
-        table += ('|      |         |         |      |\n')
-        table += ('|      |    ' + self.buff[16].print_state() + 
-        '----' + self.buff[17].print_state() + '----' +
-        self.buff[18].print_state() + '    |      |\n')
-        table += ('|      |    |         |    |      |\n')
-        table += (self.buff[7].print_state() + '      ' +
-        self.buff[15].print_state() + '    ' + self.buff[23].print_state() +
-        '         ' + self.buff[19].print_state() +
-        '    ' + self.buff[11].print_state() + '      ' +
-        self.buff[3].print_state() + '\n')
-        table+= ('|      |    |         |    |      |\n')
-        table += ('|      |    ' + self.buff[22].print_state() + '----' +
-        self.buff[21].print_state() + '----' +
-        self.buff[20].print_state() + '    |      |\n') 
-        table+= ('|      |         |         |      |\n')
-        table+= ('|      |         |         |      |\n')
-        table += ('|      ' + self.buff[14].print_state() + '---------' +
-        self.buff[13].print_state() + '---------' +
-        self.buff[12].print_state() + '      |\n')
-        table += ('|                |                |\n') 
-        table += ('|                |                |\n') 
-        table += (self.buff[6].print_state() + '----------------' +
-        self.buff[5].print_state() + '----------------' +
-        self.buff[4].print_state() + '\n')
+        table = f"{self.buff[0]}----------------"
+        table += f"{self.buff[1]}----------------"
+        table += f"{self.buff[2]}\n"
+
+        table += "|                |                |\n"
+        table += "|                |                |\n"
+
+        table += f"|      {self.buff[8]}"
+        table += f"---------{self.buff[9]}---------"
+        table += f"{self.buff[11]}      |\n"
+
+        table += "|      |         |         |      |\n"
+        table += "|      |         |         |      |\n"
+
+        table += f"|      |    {self.buff[16]}----{self.buff[17]}----{self.buff[18]}    |      |\n"
+
+        table += "|      |    |         |    |      |\n"
+
+        table += f"{self.buff[7]}      "
+        table += f"{self.buff[15]}    {self.buff[23]}"
+        table += f"         {self.buff[19]}"
+        table += f"    {self.buff[11]}      "
+        table += f"{self.buff[3]}\n"
+
+        table += "|      |    |         |    |      |\n"
+        table += f"|      |    {self.buff[22]}----{self.buff[21]}----{self.buff[20]}    |      |\n"
+
+        table += "|      |         |         |      |\n"
+        table += "|      |         |         |      |\n"
+
+        table += f"|      {self.buff[14]}"
+        table += f"---------{self.buff[13]}---------"
+        table += f"{self.buff[12]}      |\n"
+
+        table += "|                |                |\n"
+        table += "|                |                |\n"
+
+        table += f"{self.buff[6]}----------------"
+        table += f"{self.buff[5]}----------------"
+        table += f"{self.buff[4]}"
 
         return table
+
 
 class GameMode(Enum):
     PLACE = auto()
     MOVE = auto()
     DELETE = auto()
 
+
 class Turn(Enum):
     WHITE = 1
     BLACK = 2
 
+
 class MillGame:
-    """ This class encodes the game logic """
-    
-    def __init__(self, turn: Optional[Turn]=None):
-        """ turn is the one who starts. If None is given, it is chosen randomly """
+    """ This class contains the game logic """
+
+    def __init__(self, turn: Optional[Turn] = None):
+        """ turn is the turn of the one who starts the game. If None is given, it is chosen randomly """
 
         self.turn = turn if self.turn is not None else Turn(random.randint(1, 2))
         self.mode = GameMode.PLACE
@@ -202,8 +210,6 @@ class MillGame:
 
         return True
 
-    def _get_state_by_turn(self) -> CellState:
-        return CellState.BLACK if self.turn == Turn.BLACK else CellState.WHITE
 
     def move(self, ring1: int, cell1: int, ring2: int, cell2: int):
         if self.mode != GameMode.MOVE:
@@ -218,15 +224,20 @@ class MillGame:
         if self.board.get_cell(ring2, cell2) != CellState.EMPTY:
             raise ValueError(
                 "The new position of the chip must be empty")
-        
+
         self.board.remove(ring1, cell1)
         self.board.put_cell(ring2, cell2, self._get_state_by_turn())
 
-        if self.board.is_mill(ring2,cell2):
+        if self.board.is_mill(ring2, cell2):
             self.mode = GameMode.DELETE
+
+    def _get_state_by_turn(self) -> CellState:
+        return CellState.BLACK if self.turn == Turn.BLACK else CellState.WHITE
+
 
 class State:
     pass
+
 
 if __name__ == "__main__":
     tablero = Board()
@@ -242,6 +253,5 @@ if __name__ == "__main__":
     # game.remove(ring, cell) -> Indicar la razon del fallo
 
     # game.move(ring1, cell1, ring2, cell2) -> Indicar la razon del fallo
-
 
     # game.mode
