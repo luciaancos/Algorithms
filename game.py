@@ -205,6 +205,25 @@ class MillGame:
     def _get_state_by_turn(self) -> CellState:
         return CellState.BLACK if self.turn == Turn.BLACK else CellState.WHITE
 
+    def move(self, ring1: int, cell1: int, ring2: int, cell2: int):
+        if self.mode != GameMode.MOVE:
+            raise ValueError(
+                "The game mode must be 'MOVE'")
+        if not self.board.are_adjacent(ring1, cell1, ring2, cell2):
+            raise ValueError(
+                "You can only move your chips to adjacent cells")
+        if self.turn != self.board.get_cell(ring1, cell1):
+            raise ValueError(
+                "You can only move your own chips")
+        if self.board.get_cell(ring2, cell2) != CellState.EMPTY:
+            raise ValueError(
+                "The new position of the chip must be empty")
+        
+        self.board.remove(ring1, cell1)
+        self.board.put_cell(ring2, cell2, self._get_state_by_turn())
+
+            
+
 
 class State:
     pass
