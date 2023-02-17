@@ -17,7 +17,7 @@ from enum import Enum, auto
 from dataclasses import dataclass, field
 from typing import Optional
 
-from board import Board, CellState
+from board import RINGS, Board, CellState
 
 NUM_PIECES_PER_PLAYER = 9
 
@@ -34,6 +34,7 @@ class GameMode(Enum):
     """Represents the mode in which the game is in a given moment."""
     PLACE = auto()
     MOVE = auto()
+    FINISHED = auto()
 
 class Turn(Enum):
     """Represents the turn of the game in a given moment, that is, who is the
@@ -45,7 +46,7 @@ class Turn(Enum):
 class Player:
     associated_cell_state: CellState
     remaining_pieces: int = field(default=NUM_PIECES_PER_PLAYER)
-    killed_pieces: int = field(default=0)
+    alive_pieces: int = field(default=NUM_PIECES_PER_PLAYER)
 
 class MillGame:
     """
@@ -94,6 +95,9 @@ class MillGame:
         if self._check_mode(GameMode.MOVE):
             raise InvalidStateException("The game mode must be 'MOVE'")
 
+        # TODO: if the player cannot move any piece to any adajcent cell, then game the
+        # mode must change to FINISHED. Additionally, it should be stated the reason why the player has won
+
         if not self.board.are_adjacent(ring1, cell1, ring2, cell2):
             raise InvalidMoveException("You can only move the pieces to adjacent cells")
 
@@ -116,10 +120,21 @@ class MillGame:
         if not self.has_to_delete:
             raise InvalidStateException("It is not required to remove a piece")
 
-        if self.board.is_mill(ring, cell):
-            raise InvalidMoveException("You cannot remove chips belonging to a mill")
+        if self.board.get_cell(ring, cell) == CellState.EMPTY:
+            raise InvalidStateException("It is not possible to remove and empty cell")
+
+        if self.board.get_cell(ring, cell) == self.current_player().associated_cell_state:
+            raise InvalidStateException("You cannot remove chips which belong to a player")
+
+        if self.board.is_mill(ring, cell) and not self.all_pieces_form_mill(self.current_player()):
+            raise InvalidMoveException(
+                    "You cannot remove chips belonging to a mill when there are chips which don't belong to any of them")
 
         self.board.remove(ring, cell)
+        self.current_player().alive_pieces -= 1
+
+        if self.current_player().alive_pieces <= 2:
+            self.mode = GameMode.FINISHED
 
         self.has_to_delete = False
         self._change_turn()
@@ -128,6 +143,24 @@ class MillGame:
         """ Returns the current player """
 
         return self._players[self.turn.value]
+
+    def all_pieces_form_mill(self, player: Player) -> bool:
+        """ Returns whether a player has all their pieces being part of at least one mill """
+
+        # check corners
+        for ring in range(1, RINGS):
+            if (self.board.get_cell(ring, 0) == player.associated_cell_state and 
+                    (not self.board.is_mill(ring, 0) or not self.board.is_mill(ring, 4))):
+                return False
+
+        # check mill across rings
+        for cell in range(1, 8, 2):
+            if (self.board.get_cell(0, cell) == player.associated_cell_state and 
+                    not self.board.is_mill(0, cell)):
+                return False
+
+        return True
+
 
     def _change_turn(self):
         """ Changes the turn """
