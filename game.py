@@ -9,6 +9,8 @@ BOARD_SIZE = CELLS_PER_RING * RINGS
 
 
 class CellState(Enum):
+    """Represents the state of a board cell, which can either have a cell from
+    some player or be empty."""
     WHITE = auto()
     BLACK = auto()
     EMPTY = auto()
@@ -126,6 +128,7 @@ class Board:
         return True
 
     def _get_cell_idx(self, ring: int, cell: int):
+        """Returns the index in the board from a given cell."""
         if ring < 0 or ring >= RINGS:
             raise ValueError(
                 f"The ring must be between 0 and {RINGS}, but {ring} was given")
@@ -182,12 +185,15 @@ class Board:
 
 
 class GameMode(Enum):
+    """Represents the mode in which the game is in a given moment."""
     PLACE = auto()
     MOVE = auto()
     DELETE = auto()
 
 
 class Turn(Enum):
+    """Represents the turn of the game in a given moment, that is, who is the
+    active player."""
     WHITE = 1
     BLACK = 2
 
@@ -203,6 +209,7 @@ class MillGame:
         self.board = Board()
 
     def place(self, ring: int, cell: int) -> bool:
+        """Places the next chip of the active player in a cell of the board."""
         if self.mode != GameMode.PLACE or self.board.get_cell(ring, cell) != CellState.EMPTY:
             return False
 
@@ -212,6 +219,7 @@ class MillGame:
 
 
     def move(self, ring1: int, cell1: int, ring2: int, cell2: int):
+        """Moves a chip of the active player placed in the board to another cell."""
         if self.mode != GameMode.MOVE:
             raise ValueError(
                 "The game mode must be 'MOVE'")
@@ -232,6 +240,7 @@ class MillGame:
             self.mode = GameMode.DELETE
 
     def remove(self, ring: int, cell: int):
+        """Removes a cell from the board permanently."""
         if self.mode != GameMode.DELETE:
             raise ValueError(
                 "The game mode must be 'DELETE'")
@@ -242,6 +251,7 @@ class MillGame:
         self.board.remove(ring, cell)
 
     def _get_state_by_turn(self) -> CellState:
+        """Returns the state of cells owned by the active player."""
         return CellState.BLACK if self.turn == Turn.BLACK else CellState.WHITE
 
 
