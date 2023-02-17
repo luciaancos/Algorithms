@@ -1,6 +1,6 @@
 import unittest
 
-from game import Board, CellState
+from board import Board, CellState
 
 class TestBoard(unittest.TestCase):
 
