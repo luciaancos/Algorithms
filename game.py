@@ -14,26 +14,38 @@ Authors:
 import random
 
 from enum import Enum, auto
+from dataclasses import dataclass, field
 from typing import Optional
 
 from board import Board, CellState
 
+NUM_PIECES_PER_PLAYER = 9
+
+class MillGameException(Exception):
+    """ Raised when mill game logic does not approve an action """
+
+class InvalidStateException(MillGameException):
+    """ Raised when the action cannot be executed because the game is in a invalid state """
+
+class InvalidMoveException(MillGameException):
+    """ Raised when the mill game board wants to be altered in a non conformant way with the rules """
 
 class GameMode(Enum):
     """Represents the mode in which the game is in a given moment."""
-
     PLACE = auto()
     MOVE = auto()
-    DELETE = auto()
-
 
 class Turn(Enum):
     """Represents the turn of the game in a given moment, that is, who is the
     active player."""
+    WHITE = 0
+    BLACK = 1
 
-    WHITE = 1
-    BLACK = 2
-
+@dataclass
+class Player:
+    associated_cell_state: CellState
+    remaining_pieces: int = field(default=NUM_PIECES_PER_PLAYER)
+    killed_pieces: int = field(default=0)
 
 class MillGame:
     """
@@ -48,74 +60,85 @@ class MillGame:
     """
 
     def __init__(self, turn: Optional[Turn] = None):
-        """Create an instance of the MillGame class."""
-        # turn is the turn of the one who starts the game. If None is given,
-        # it is chosen randomly
-        self.turn = turn if self.turn is not None else Turn(random.randint(1, 2))
+        """ turn is the turn of the one who starts the game. If None is given, it is chosen randomly """
+
+        self.turn = turn if turn is not None else Turn(random.randint(0, 1))
         self.mode = GameMode.PLACE
+        self.has_to_delete = False
         self.board = Board()
 
-    def place(self, ring: int, cell: int) -> bool:
+        self._players = [Player(CellState.WHITE), Player(CellState.BLACK)]
+
+    def place(self, ring: int, cell: int):
         """Place the next chip of the active player in a cell of the board."""
-        if (
-            self.mode != GameMode.PLACE
-            or self.board.get_cell(ring, cell) != CellState.EMPTY
-        ):
-            return False
+        if self._check_mode(GameMode.PLACE):
+            raise InvalidStateException("The game mode must be 'PLACE'")
 
-        self.board.put_cell(ring, cell, self._get_state_by_turn())
+        if self.board.get_cell(ring, cell) != CellState.EMPTY:
+            raise InvalidMoveException("The cell is not empty")
 
-        return True
+        self.board.put_cell(ring, cell, self.current_player().associated_cell_state)
+
+        # check if we have to move to the 'MOVE' state by checking the remaining pieces each player has 
+        self.current_player().remaining_pieces -= 1
+        if self._players[Turn.WHITE.value].remaining_pieces == 0 and self._players[Turn.BLACK.value].remaining_pieces == 0:
+            self.mode = GameMode.MOVE
+
+        if self.board.is_mill(ring, cell):
+            self.has_to_delete = True
+        else:
+            self._change_turn()
 
     def move(self, ring1: int, cell1: int, ring2: int, cell2: int):
         """Move a chip of the active player placed in the board to another cell."""
-        if self.mode != GameMode.MOVE:
-            raise ValueError("The game mode must be 'MOVE'")
+        if self._check_mode(GameMode.MOVE):
+            raise InvalidStateException("The game mode must be 'MOVE'")
+
         if not self.board.are_adjacent(ring1, cell1, ring2, cell2):
-            raise ValueError("You can only move your chips to adjacent cells")
-        if self.turn != self.board.get_cell(ring1, cell1):
-            raise ValueError("You can only move your own chips")
+            raise InvalidMoveException("You can only move the pieces to adjacent cells")
+
+        if self.current_player().associated_cell_state != self.board.get_cell(ring1, cell1):
+            raise InvalidMoveException("You can only move your own pieces")
+
         if self.board.get_cell(ring2, cell2) != CellState.EMPTY:
-            raise ValueError("The new position of the chip must be empty")
+            raise InvalidMoveException("The new position of the piece must be empty")
 
         self.board.remove(ring1, cell1)
-        self.board.put_cell(ring2, cell2, self._get_state_by_turn())
+        self.board.put_cell(ring2, cell2, self.current_player().associated_cell_state)
 
         if self.board.is_mill(ring2, cell2):
-            self.mode = GameMode.DELETE
+            self.has_to_delete = True
+        else:
+            self._change_turn()
 
-    def remove(self, ring: int, cell: int):
+    def remove(self, ring, cell):
         """Remove a cell from the board permanently."""
-        if self.mode != GameMode.DELETE:
-            raise ValueError("The game mode must be 'DELETE'")
+        if not self.has_to_delete:
+            raise InvalidStateException("It is not required to remove a piece")
+
         if self.board.is_mill(ring, cell):
-            raise ValueError("You cannot remove chips belonging to a mill")
+            raise InvalidMoveException("You cannot remove chips belonging to a mill")
 
         self.board.remove(ring, cell)
 
-    def _get_state_by_turn(self) -> CellState:
-        """Return the state of cells owned by the active player."""
-        return CellState.BLACK if self.turn == Turn.BLACK else CellState.WHITE
+        self.has_to_delete = False
+        self._change_turn()
 
+    def current_player(self) -> Player:
+        """ Returns the current player """
 
-class State:
-    # TODO: Implement
-    pass
+        return self._players[self.turn.value]
 
+    def _change_turn(self):
+        """ Changes the turn """
+
+        self.turn = Turn(1 - self.turn.value)
+
+    def _check_mode(self, mode: GameMode) -> bool:
+        """ Checks whether the methods associated with a specific mode can be run """
+
+        return self.mode == mode and not self.has_to_delete
 
 if __name__ == "__main__":
-    tablero = Board()
-    print(tablero)
-
-    # game = MillGame(turn=, )
-
-    # game.place(ring, cell) -> bool
-    # game.place(ring, cell)
-
-    # # Si se llama a un método distinto a los que permite el modo en el que se encuentra
-    # # el juego, crashe
-    # game.remove(ring, cell) -> Indicar la razon del fallo
-
-    # game.move(ring1, cell1, ring2, cell2) -> Indicar la razon del fallo
-
-    # game.mode
+    board = Board()
+    print(board)
