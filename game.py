@@ -231,6 +231,16 @@ class MillGame:
         if self.board.is_mill(ring2, cell2):
             self.mode = GameMode.DELETE
 
+    def remove(self, ring: int, cell: int):
+        if self.mode != GameMode.DELETE:
+            raise ValueError(
+                "The game mode must be 'DELETE'")
+        if self.board.is_mill(ring, cell):
+            raise ValueError(
+                "You cannot remove chips belonging to a mill")
+
+        self.board.remove(ring, cell)
+
     def _get_state_by_turn(self) -> CellState:
         return CellState.BLACK if self.turn == Turn.BLACK else CellState.WHITE
 
