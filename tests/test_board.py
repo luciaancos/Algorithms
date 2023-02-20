@@ -2,6 +2,7 @@ import unittest
 
 from board import Board, CellState
 
+
 class TestBoard(unittest.TestCase):
 
     def test_get_cell(self):
@@ -82,6 +83,19 @@ class TestBoard(unittest.TestCase):
         self.assertFalse(board.is_mill(2, 6))
         self.assertFalse(board.is_mill(2, 7))
         self.assertFalse(board.is_mill(2, 5))
+
+    def test_is_any_adjacent_cell_empty(self):
+        board = Board()
+
+        board.put_cell(0, 1, CellState.WHITE)
+        board.put_cell(1, 0, CellState.WHITE)
+        board.put_cell(1, 2, CellState.WHITE)
+
+        self.assertTrue(board.is_any_adjacent_cell_empty(1, 1))
+
+        board.put_cell(2, 1, CellState.BLACK)
+
+        self.assertFalse(board.is_any_adjacent_cell_empty(1, 1))
 
     def test_is_mill_across_ring(self):
         board = Board()

@@ -17,7 +17,7 @@ from enum import Enum, auto
 from dataclasses import dataclass, field
 from typing import Optional
 
-from board import RINGS, Board, CellState
+from board import CELLS_PER_RING, RINGS, Board, CellState
 
 NUM_PIECES_PER_PLAYER = 9
 
@@ -103,9 +103,6 @@ class MillGame:
         if not self._check_mode(GameMode.MOVE):
             raise InvalidStateException("The game mode must be 'MOVE'")
 
-        # TODO: if the player cannot move any piece to any adajcent cell, then game the
-        # mode must change to FINISHED. Additionally, it should be stated the reason why the player has won
-
         if not self.board.are_adjacent(ring1, cell1, ring2, cell2):
             raise InvalidMoveException(
                 "You can only move the pieces to adjacent cells")
@@ -121,11 +118,10 @@ class MillGame:
         self.board.put_cell(
             ring2, cell2, self.current_player().associated_cell_state)
 
-        # this is where it should be checked whether the other player can move its pieces to adjacent cells 
-        # if it were not possible, the mode should change to FINISHED
-
         if self.board.is_mill(ring2, cell2):
             self.has_to_delete = True
+        elif not self.can_move_to_any_adjacent_cell(self.other_player()):
+            self.mode = GameMode.FINISHED
         else:
             self._change_turn()
 
@@ -183,6 +179,20 @@ class MillGame:
                 return False
 
         return True
+
+    def can_move_to_any_adjacent_cell(self, player: Player) -> bool:
+        """ Checks whether there exist one piece from 'player' which can be moved to an adjacent cell """
+
+        # TODO: this can be improved if we don't have traverse the board in order to find 'player's pieces.
+        # That information could be stored on an array. The disadvantage is that we must be careful on keeping
+        # the array in sync with the board
+
+        for ring in range(RINGS):
+            for cell in range(CELLS_PER_RING):
+                if self.board.get_cell(ring, cell) == player.associated_cell_state and self.board.is_any_adjacent_cell_empty(ring, cell):
+                    return True
+
+        return False
 
     def _change_turn(self):
         """ Changes the turn """

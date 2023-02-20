@@ -40,7 +40,8 @@ class Board:
         """Create an instance of the Board class."""
         # buff is a 24 sized list which represents the board. If None is given,
         # an empty board will be generated
-        self.buff = buff if buff is not None else [CellState.EMPTY] * BOARD_SIZE
+        self.buff = buff if buff is not None else [
+            CellState.EMPTY] * BOARD_SIZE
 
         if len(self.buff) > BOARD_SIZE:
             raise ValueError(
@@ -66,6 +67,19 @@ class Board:
         """Return whether the cell in a specific has a connection with an
         inner or outer ring."""
         return cell % 2 == 1
+
+    def is_any_adjacent_cell_empty(self, ring: int, cell: int) -> bool:
+        """ Checks whether at least one adjacent to (ring, cell) is empty """
+
+        for i, j in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+            adj_ring, adj_cell = ring + i, cell + j
+            if adj_ring < 0 or adj_ring >= RINGS or adj_cell < 0 or adj_cell >= CELLS_PER_RING:
+                continue
+
+            if self.get_cell(adj_ring, adj_cell) == CellState.EMPTY:
+                return True
+
+        return False
 
     def are_adjacent(self, ring1: int, cell1: int, ring2: int, cell2: int) -> bool:
         """Return true iff the two positions are adjacent."""
