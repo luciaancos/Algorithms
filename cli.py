@@ -10,6 +10,7 @@ def delete_chip(game: MillGame):
     except(ValueError, InvalidMoveException, InvalidStateException) as error:
         print('\nERROR:', error)
 
+
 def main():
     game = MillGame()
 
@@ -42,6 +43,9 @@ def main():
 
                 if game.has_to_delete:
                     delete_chip(game)
+
+    print('CONGRATULATIONS ', game.turn.name, ' PLAYER, YOU HAVE WON')
+    print('End of the game...')
 
 if __name__ == "__main__":
     main()
