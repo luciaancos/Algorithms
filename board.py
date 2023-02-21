@@ -146,12 +146,12 @@ class Board:
         """Return the index in the board from a given cell."""
         if ring < 0 or ring >= RINGS:
             raise ValueError(
-                f"The ring must be between 0 and {RINGS}, but {ring} was given"
+                f"The ring must be between 0 and {RINGS-1}, but {ring} was given \n"
             )
 
         if cell < 0 or cell >= CELLS_PER_RING:
             raise ValueError(
-                f"The cell must be between 0 and {CELLS_PER_RING}, but {cell} was given"
+                f"The cell must be between 0 and {CELLS_PER_RING-1}, but {cell} was given \n"
             )
 
         return ring * CELLS_PER_RING + cell
@@ -167,7 +167,7 @@ class Board:
 
         table += f"|      {self.buff[8]}"
         table += f"---------{self.buff[9]}---------"
-        table += f"{self.buff[11]}      |\n"
+        table += f"{self.buff[10]}      |\n"
 
         table += "|      |         |         |      |\n"
         table += "|      |         |         |      |\n"
