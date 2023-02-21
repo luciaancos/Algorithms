@@ -120,8 +120,6 @@ class MillGame:
 
         if self.board.is_mill(ring2, cell2):
             self.has_to_delete = True
-        elif not self.can_move_to_any_adjacent_cell(self.other_player()):
-            self.mode = GameMode.FINISHED
         else:
             self._change_turn()
 
@@ -147,9 +145,10 @@ class MillGame:
 
         if self.other_player().alive_pieces <= 2:
             self.mode = GameMode.FINISHED
+        else:
+            self._change_turn()
 
         self.has_to_delete = False
-        self._change_turn()
 
     def other_player(self) -> Player:
         """ Return the player who is not the current player """
@@ -197,7 +196,14 @@ class MillGame:
     def _change_turn(self):
         """ Changes the turn """
 
-        self.turn = Turn(1 - self.turn.value)
+        # every time a piece in the board is removed or moved it is possible that
+        # the configuration is such that the other player cannot move to any adjacent cell.
+        # In that case, game is lost
+
+        if self.mode == GameMode.MOVE and not self.can_move_to_any_adjacent_cell(self.other_player()):
+            self.mode = GameMode.FINISHED
+        else:
+            self.turn = Turn(1 - self.turn.value)
 
     def _check_mode(self, mode: GameMode) -> bool:
         """ Checks whether the methods associated with a specific mode can be run """

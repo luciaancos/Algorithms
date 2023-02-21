@@ -85,10 +85,47 @@ class TestMillGame(unittest.TestCase):
         self.assertEqual(game.mode, GameMode.PLACE)
 
     def test_finish_mode_from_remove(self):
-        pass
+        game = MillGame(turn=Turn.WHITE)
+        game.mode = GameMode.MOVE
+        game.has_to_delete = True
+        game._players[0].alive_pieces = 3
+        game._players[1].alive_pieces = 3
 
-    def test_finish_mode_from_move(self):
-        pass
+        game.board.buff[0] = CellState.WHITE
+        game.board.buff[1] = CellState.WHITE
+        game.board.buff[2] = CellState.WHITE
+
+        game.board.buff[23] = CellState.BLACK
+        game.board.buff[18] = CellState.BLACK
+        game.board.buff[15] = CellState.BLACK
+
+        game.remove(2, 7)
+
+        self.assertEqual(game.mode, GameMode.FINISHED)
+        self.assertEqual(game.turn, Turn.WHITE)
+
+
+    def test_finish_change_turn(self):
+        game = MillGame(turn=Turn.WHITE)
+        game.mode = GameMode.MOVE
+        game.has_to_delete = True
+
+        game.board.buff[0] = CellState.WHITE
+        game.board.buff[1] = CellState.WHITE
+        game.board.buff[2] = CellState.WHITE
+
+        game.board.buff[9] = CellState.BLACK
+
+        game.board.buff[8] = CellState.WHITE
+        game.board.buff[10] = CellState.WHITE
+        game.board.buff[17] = CellState.WHITE
+
+        game.board.buff[4] = CellState.BLACK
+
+        game.remove(0, 4)
+
+        self.assertEqual(game.mode, GameMode.FINISHED)
+        self.assertEqual(game.turn, Turn.WHITE)
 
     def test_invalid_move(self):
         game = MillGame(turn=Turn.WHITE)
