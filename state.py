@@ -43,46 +43,45 @@ class State:
             if self.game.board.buff[i] == CellState.EMPTY:
                 self.free.append(i)
 
-        auxB = []
-        for i in range(24):
-            if self.game.board.buff[i] == CellState.BLACK:
-                auxB.append(i)
-        self.gamer[0] = auxB
-
         auxW = []
         for i in range(24):
             if self.game.board.buff[i] == CellState.WHITE:
                 auxW.append(i)
-        self.gamer[1] = auxW
+        self.gamer[0] = auxW
+        auxB = []
+        for i in range(24):
+            if self.game.board.buff[i] == CellState.BLACK:
+                auxB.append(i)
+        self.gamer[1] = auxB
 
         self.chips.append(self.game._players[0].remaining_pieces)
         self.chips.append(self.game._players[1].remaining_pieces)
 
     def generate_succ_place(self, successors: list[Action]) -> list[Action]:
         for free_chip in self.free:
-                game_copy = copy.deepcopy(self.game)
-                try:
-                    game_copy.place(free_chip//8,free_chip%8)
-                except(ValueError, InvalidMoveException, InvalidStateException):
-                    continue
-                
-                if game_copy.has_to_delete:
-                    for opponent_chip in self.gamer[self.turn.value]:
-                        try:
-                            game_copy.remove(opponent_chip//8, opponent_chip%8)
-                        except(ValueError, InvalidMoveException, InvalidStateException):
-                            continue
-                        next_state = State(game_copy)
-                        move = Move(-1,free_chip, opponent_chip)
-                        sucessor = Sucesor(self, move,next_state)
-                        action = Action(move, sucessor)
-                        successors.append(action)
-                else:
+            game_copy = copy.deepcopy(self.game)
+            try:
+                game_copy.place(free_chip//8,free_chip%8)
+            except(ValueError, InvalidMoveException, InvalidStateException):
+                continue
+            
+            if game_copy.has_to_delete:
+                for opponent_chip in self.gamer[self.turn.value]:
+                    try:
+                        game_copy.remove(opponent_chip//8, opponent_chip%8)
+                    except(ValueError, InvalidMoveException, InvalidStateException):
+                        continue
                     next_state = State(game_copy)
-                    move = Move(-1,free_chip, -1)           
+                    move = Move(-1,free_chip, opponent_chip)
                     sucessor = Sucesor(self, move,next_state)
                     action = Action(move, sucessor)
                     successors.append(action)
+            else:
+                next_state = State(game_copy)
+                move = Move(-1,free_chip, -1)           
+                sucessor = Sucesor(self, move,next_state)
+                action = Action(move, sucessor)
+                successors.append(action)
         return successors
 
     def generate_succ_move(self, successors: list[Action]) -> list[Action]:
@@ -103,7 +102,7 @@ class State:
                             move = Move(player_chip,free_chip, opponent_chip)
                             sucessor = Sucesor(self, move, next_state)
                             action = Action(move, sucessor)
-                            successors.append(action.__str__())
+                            successors.append(action)
                     else:
                         next_state = State(game_copy)
                         move = Move(player_chip,free_chip, -1)                     
