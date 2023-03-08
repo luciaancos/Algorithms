@@ -18,7 +18,6 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 from board import CELLS_PER_RING, RINGS, Board, CellState
-from state import Move
 
 NUM_PIECES_PER_PLAYER = 9
 
@@ -193,7 +192,7 @@ class MillGame:
                     return True
 
         return False
-    
+
     def is_valid_play(self, sucesor_dict: dict) -> bool:
         """Check if a given dictionary representing a successor received from
         another player is a valid play."""
@@ -203,15 +202,10 @@ class MillGame:
             # TODO: raise exception for a not corresponding state?
             pass
 
-        move = Move(
-            sucesor_dict[1]["INIT_POS"], sucesor_dict[1]["NEXT_POS"],
-            sucesor_dict[1]["KILL"]
-            )
-
-        ring_dest, cell_dest = divmod(move.next_pos, 8)
+        ring_dest, cell_dest = divmod(sucesor_dict[1]["NEXT_POS"], 8)
 
         # If the player wants to place a free chip
-        if move.pos_init == -1:
+        if sucesor_dict[1]["INIT_POS"] == -1:
             try:
                 self.place(ring_dest, cell_dest)
             except InvalidStateException as ex:
@@ -221,7 +215,7 @@ class MillGame:
                 print(ex)
                 return False
         else:
-            ring_init, cell_init = divmod(move.pos_init, 8)
+            ring_init, cell_init = divmod(sucesor_dict[1]["INIT_POS"], 8)
             # If the player wants to move a chip placed on the board
             try:
                 self.move(ring_init, cell_init, ring_dest, cell_dest)
@@ -232,8 +226,8 @@ class MillGame:
                 print(ex)
                 return False
             # If the player wants to also remove one of our chips
-            if move.kill != -1:
-                ring_kill, cell_kill = divmod(move.kill, 8)
+            if sucesor_dict[1]["KILL"] != -1:
+                ring_kill, cell_kill = divmod(sucesor_dict[1]["KILL"], 8)
                 try:
                     self.remove(ring_kill, cell_kill)
                 except InvalidStateException as ex:
@@ -242,7 +236,7 @@ class MillGame:
                 except InvalidMoveException as ex:
                     print(ex)
                     return False
-        
+
         # Check if the next state provided by the other player corresponds to
         # our game's new board state after the move
         next_state = sucesor_dict[2]
@@ -252,14 +246,13 @@ class MillGame:
 
         return True
 
-    
     def _is_correct_state(self, state_dict: dict) -> bool:
         """Check if a given dictionary representing a state received from
         another player corresponds the game's board current state."""
         state_buff = [CellState.EMPTY] * 24
         white_placed_chips = state_dict["GAMER"][0]
         black_placed_chips = state_dict["GAMER"][1]
-        
+
         for pos in state_dict["FREE"]:
             if self.board.buff[pos] != CellState.EMPTY:
                 return False
@@ -268,7 +261,7 @@ class MillGame:
             state_buff[chip] = CellState.WHITE
         for chip in black_placed_chips:
             state_buff[chip] = CellState.BLACK
-        
+
         if (
             state_buff != self.board.buff
             or self.turn != state_dict["TURN"]
@@ -277,7 +270,6 @@ class MillGame:
             ):
             return False
         return True
-
 
     def _change_turn(self):
         """ Changes the turn """
