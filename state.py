@@ -21,6 +21,7 @@ class Sucesor:
 
     def __str__(self) -> str:
         return f"<sucesor>={{'STATE':{self.state},'MOVE':{self.move},'NEXT_STATE':{self.next_state}}}"
+# TODO: Action has a move, and Action.sucesor has it again?
 @dataclass
 class Action:
     move: Move
@@ -37,7 +38,7 @@ class State:
         self.free = [] 
         self.gamer = [[],[]]
         self.turn = game.turn
-        self.chips = []
+        self.chips = [[],[]]
 
         for i in range(24):
             if self.game.board.buff[i] == CellState.EMPTY:
