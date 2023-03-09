@@ -20,20 +20,13 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 from board import CELLS_PER_RING, RINGS, Board, CellState
+from mill_game_exceptions import (
+    MillGameException,
+    InvalidStateException,
+    InvalidMoveException
+)
 
 NUM_PIECES_PER_PLAYER = 9
-
-
-class MillGameException(Exception):
-    """ Raised when mill game logic does not approve an action """
-
-
-class InvalidStateException(MillGameException):
-    """ Raised when the action cannot be executed because the game is in a invalid state """
-
-
-class InvalidMoveException(MillGameException):
-    """ Raised when the mill game board wants to be altered in a non conformant way with the rules """
 
 
 class GameMode(Enum):
@@ -80,8 +73,8 @@ class Move:
         data = json.loads(json_str)
         return cls(
             data["NEXT_POS"],
-            None if data["POS_INIT"] == -1 else (data["POS_INIT"] // 8, data["POS_INIT"] % 8),
-            None if data["KILL"] == -1 else (data["KILL"] // 8, data["KILL"] % 8)
+            None if data["POS_INIT"] == -1 else divmod(data["POS_INIT"], 8),
+            None if data["KILL"] == -1 else divmod(data["KILL"], 8)
         )
 
     def to_json(self) -> str:
@@ -129,7 +122,8 @@ class MillGame:
             if move.kill is None:
                 self.move(*move.pos_init, *move.next_pos)
             else:
-                self.move_and_remove(*move.pos_init, *move.next_pos, *move.kill)
+                self.move_and_remove(
+                    *move.pos_init, *move.next_pos, *move.kill)
 
     def check_place(self, ring: int, cell: int):
         """ Checks whether the current player can place a piece in (ring, cell) """
@@ -191,7 +185,7 @@ class MillGame:
             self.has_to_delete = True
             try:
                 self.remove(rem_ring, rem_cell)
-            except (ValueError, InvalidMoveException) as exc:
+            except MillGameException as exc:
                 # Undo the call to put_cell
                 self.board.remove(ring, cell)
                 self.has_to_delete = False
@@ -216,7 +210,8 @@ class MillGame:
 
         def undo_move():
             self.board.remove(ring2, cell2)
-            self.board.put_cell(ring1, cell1, self.current_player().associated_cell_state)
+            self.board.put_cell(
+                ring1, cell1, self.current_player().associated_cell_state)
 
         self.check_move(ring1, cell1, ring2, cell2)
 
@@ -228,7 +223,7 @@ class MillGame:
             self.has_to_delete = True
             try:
                 self.remove(rem_ring, rem_cell)
-            except (ValueError, InvalidMoveException) as exc:
+            except MillGameException as exc:
                 # Undo the call to remove and put_cell
                 undo_move()
                 self.has_to_delete = False

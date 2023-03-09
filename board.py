@@ -1,9 +1,13 @@
 from enum import Enum, auto
 from typing import Optional
 
+from mill_game_exceptions import InvalidBoardPosition 
+
 CELLS_PER_RING = 8
 RINGS = 3
 BOARD_SIZE = CELLS_PER_RING * RINGS
+
+ALL_POSITIONS = [(ring, cell) for ring in range(RINGS) for cell in range(CELLS_PER_RING)]
 
 
 class CellState(Enum):
@@ -145,12 +149,12 @@ class Board:
     def _get_cell_idx(self, ring: int, cell: int) -> int:
         """Return the index in the board from a given cell."""
         if ring < 0 or ring >= RINGS:
-            raise ValueError(
+            raise  InvalidBoardPosition(
                 f"The ring must be between 0 and {RINGS-1}, but {ring} was given \n"
             )
 
         if cell < 0 or cell >= CELLS_PER_RING:
-            raise ValueError(
+            raise InvalidBoardPosition(
                 f"The cell must be between 0 and {CELLS_PER_RING-1}, but {cell} was given \n"
             )
 

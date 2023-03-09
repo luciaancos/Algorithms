@@ -1,10 +1,7 @@
 from __future__ import annotations
 import copy
-from dataclasses import dataclass
 from typing import Optional
-from game import GameMode, InvalidMoveException, InvalidStateException, MillGame, CellState
-import json
-
+from game import GameMode, InvalidMoveException, InvalidStateException, MillGame, CellState, Move
 
 
 
@@ -17,8 +14,16 @@ import json
     # def __str__(self) -> str:
         # return f"<sucesor>={{'STATE':{self.state},'MOVE':{self.move},'NEXT_STATE':{self.next_state}}}"
 
-
 class State:
+
+    def __init__(self, 
+            game: MillGame,
+            move: Optional[Move] = None,
+            parent: Optional[State] = None):
+        pass
+
+
+class State2:
 
     def __init__(self,
                  game: MillGame):
