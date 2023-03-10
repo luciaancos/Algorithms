@@ -108,7 +108,7 @@ class MillGame:
         self.has_to_delete = False
         self.board = Board()
 
-        self._players = [Player(CellState.WHITE), Player(CellState.BLACK)]
+        self.players = [Player(CellState.WHITE), Player(CellState.BLACK)]
 
     def apply_move(self, move: Move):
         """ Apply the given move """
@@ -246,7 +246,7 @@ class MillGame:
 
         # check if we have to move to the 'MOVE' state by checking the remaining pieces each player has
         self.current_player().remaining_pieces -= 1
-        if self._players[Turn.WHITE.value].remaining_pieces == 0 and self._players[Turn.BLACK.value].remaining_pieces == 0:
+        if self.current_player().remaining_pieces == 0 and self.other_player().remaining_pieces == 0:
             self.mode = GameMode.MOVE
 
         if self.board.is_mill(ring, cell):
@@ -286,12 +286,12 @@ class MillGame:
     def other_player(self) -> Player:
         """ Return the player who is not the current player """
 
-        return self._players[1 - self.turn.value]
+        return self.players[1 - self.turn.value]
 
     def current_player(self) -> Player:
         """ Returns the current player """
 
-        return self._players[self.turn.value]
+        return self.players[self.turn.value]
 
     def all_pieces_form_mill(self, player: Player) -> bool:
         """ Returns whether a player has all their pieces being part of at least one mill """
@@ -398,8 +398,8 @@ class MillGame:
         if (
             state_buff != self.board.buff
             or self.turn != state_dict["TURN"]
-            or self._players[0].remaining_pieces != state_dict["CHIPS"][0]
-            or self._players[1].remaining_pieces != state_dict["CHIPS"][1]
+            or self.players[0].remaining_pieces != state_dict["CHIPS"][0]
+            or self.players[1].remaining_pieces != state_dict["CHIPS"][1]
         ):
             return False
         return True

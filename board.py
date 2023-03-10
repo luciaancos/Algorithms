@@ -7,7 +7,7 @@ CELLS_PER_RING = 8
 RINGS = 3
 BOARD_SIZE = CELLS_PER_RING * RINGS
 
-ALL_POSITIONS = [(ring, cell) for ring in range(RINGS) for cell in range(CELLS_PER_RING)]
+ALL_BOARD_POSITIONS = [(ring, cell) for ring in range(RINGS) for cell in range(CELLS_PER_RING)]
 
 
 class CellState(Enum):

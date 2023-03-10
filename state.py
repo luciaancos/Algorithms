@@ -1,125 +1,107 @@
 from __future__ import annotations
+
 import copy
+
 from typing import Optional
-from game import GameMode, InvalidMoveException, InvalidStateException, MillGame, CellState, Move
+from game import (
+    GameMode,
+    MillGame,
+    Move,
+)
+from mill_game_exceptions import MillGameException
+from board import ALL_BOARD_POSITIONS, CellState
+from collections.abc import Iterator
 
-
-
-# @dataclass
-# class Sucesor:
-    # state: State
-    # move: Move
-    # next_state: State
-
-    # def __str__(self) -> str:
-        # return f"<sucesor>={{'STATE':{self.state},'MOVE':{self.move},'NEXT_STATE':{self.next_state}}}"
 
 class State:
 
-    def __init__(self, 
-            game: MillGame,
-            move: Optional[Move] = None,
-            parent: Optional[State] = None):
-        pass
-
-
-class State2:
-
     def __init__(self,
-                 game: MillGame):
+                 game: MillGame,
+                 move: Optional[Move] = None,
+                 parent: Optional[State] = None):
+
         self.game = game
-        self.free = []
-        self.gamer = [[], []]
-        self.turn = game.turn
-        self.chips = [[], []]
+        self.move = move
+        self.parent = parent
 
-        for i in range(24):
-            if self.game.board.buff[i] == CellState.EMPTY:
-                self.free.append(i)
+        self.free_pieces = [(ring, cell) for ring, cell in ALL_BOARD_POSITIONS
+                            if game.board.get_cell(ring, cell) == CellState.EMPTY]
 
-        auxW = []
-        for i in range(24):
-            if self.game.board.buff[i] == CellState.WHITE:
-                auxW.append(i)
-        self.gamer[0] = auxW
-        auxB = []
-        for i in range(24):
-            if self.game.board.buff[i] == CellState.BLACK:
-                auxB.append(i)
-        self.gamer[1] = auxB
+        white_player_pieces = [(ring, cell) for ring, cell in ALL_BOARD_POSITIONS
+                               if game.board.get_cell(ring, cell) == CellState.WHITE]
+        black_player_pieces = [(ring, cell) for ring, cell in ALL_BOARD_POSITIONS
+                               if game.board.get_cell(ring, cell) == CellState.BLACK]
 
-        self.chips.append(self.game._players[0].remaining_pieces)
-        self.chips.append(self.game._players[1].remaining_pieces)
+        self.players = [white_player_pieces, black_player_pieces]
 
-    def generate_succ_place(self, successors: list[Action]) -> list[Action]:
-        for free_chip in self.free:
+    def _generate_place_sucessors(self) -> Iterator[State]:
+        oponent_turn = 1 - self.game.turn.value
+
+        for free_pos in self.free_pieces:
             game_copy = copy.deepcopy(self.game)
             try:
-                game_copy.place(free_chip//8, free_chip % 8)
-            except (ValueError, InvalidMoveException, InvalidStateException):
+                game_copy.place(*free_pos)
+            except MillGameException:
                 continue
 
             if game_copy.has_to_delete:
-                for opponent_chip in self.gamer[self.turn.value]:
+                for op_pos in self.players[oponent_turn]:
+                    remove_copy = copy.deepcopy(game_copy)
                     try:
-                        game_copy.remove(opponent_chip//8, opponent_chip % 8)
-                    except (ValueError, InvalidMoveException, InvalidStateException):
+                        remove_copy.remove(*op_pos)
+                    except MillGameException:
                         continue
-                    next_state = State(game_copy)
-                    move = Move(-1, free_chip, opponent_chip)
-                    sucessor = Sucesor(self, move, next_state)
-                    action = Action(move, sucessor)
-                    successors.append(action)
-            else:
-                next_state = State(game_copy)
-                move = Move(-1, free_chip, -1)
-                sucessor = Sucesor(self, move, next_state)
-                action = Action(move, sucessor)
-                successors.append(action)
-        return successors
+                    move = Move(pos_init=None,
+                                next_pos=free_pos,
+                                kill=op_pos
+                            )
 
-    def generate_succ_move(self, successors: list[Action]) -> list[Action]:
-        for player_chip in self.gamer[1 - self.turn.value]:
-            for free_chip in self.free:
+                    yield State(remove_copy, move, self)
+            else:
+                move = Move(pos_init=None,
+                            next_pos=free_pos,
+                            kill=None)
+                yield State(game_copy, move, self)
+
+    def _generate_move_sucessors(self) -> Iterator[State]:
+        oponent_turn = 1 - self.game.turn.value
+
+        for init_pos in self.players[self.game.turn.value]:
+            for free_pos in self.free_pieces:
                 game_copy = copy.deepcopy(self.game)
                 try:
-                    game_copy.move(player_chip//8, player_chip %
-                                   8, free_chip//8, free_chip % 8)
-                except (ValueError, InvalidMoveException, InvalidStateException):
+                    game_copy.move(*init_pos, *free_pos)
+                except MillGameException:
                     continue
-                if game_copy.has_to_delete:
-                    for opponent_chip in self.chips[self.turn.value]:
-                        try:
-                            game_copy.remove(opponent_chip//8,
-                                             opponent_chip % 8)
-                        except (ValueError, InvalidMoveException, InvalidStateException):
-                            continue
-                        next_state = State(game_copy)
-                        move = Move(player_chip, free_chip, opponent_chip)
-                        sucessor = Sucesor(self, move, next_state)
-                        action = Action(move, sucessor)
-                        successors.append(action)
-                else:
-                    next_state = State(game_copy)
-                    move = Move(player_chip, free_chip, -1)
-                    sucessor = Sucesor(self, move, next_state)
-                    action = Action(move, sucessor)
-                    successors.append(action)
 
-    def successors(self) -> list[Action]:
-        successors = []
+                if game_copy.has_to_delete:
+                    for op_pos in self.players[oponent_turn]:
+                        remove_copy = copy.deepcopy(game_copy)
+                        try:
+                            remove_copy.remove(*op_pos)
+                        except MillGameException:
+                            continue
+                        move = Move(pos_init=init_pos,
+                                    next_pos=free_pos,
+                                    kill=op_pos)
+                        yield State(remove_copy, move, self)
+                else:
+                    move = Move(pos_init=init_pos,
+                                next_pos=free_pos,
+                                kill=None)
+                    yield State(game_copy, move, self)
+
+    def successors(self) -> Iterator[State]:
+        """ Returns a generator with all the successors states of the current one """ 
 
         if self.game.mode == GameMode.PLACE:
-            successors = self.generate_succ_place(successors)
+            yield from self._generate_place_sucessors()
+        elif self.game.mode == GameMode.MOVE:
+            yield from self._generate_move_sucessors()
 
-        if self.game.mode == GameMode.MOVE:
-            successors = self.generate_succ_move(successors)
-
-        return successors
-
-    def __str__(self) -> str:
-        joined_free = ",".join(map(str, self.free))
-        joined_gamers = ",".join(map(str, self.gamer))
-        joined_chips = ",".join(map(str, self.chips))
-        return f"<state>={{'FREE':[ {joined_free} ],'GAMER':[{joined_gamers}],'TURN':{self.turn.name},'CHIPS':{joined_chips}}}"
+    def __str__(self):
+        joined_free = ",".join(map(str, [ring * 8 + cell for ring, cell in self.free_pieces]))
+        joined_players = ",".join(map(str, [[ring * 8 + cell for ring, cell in player] for player in self.players]))
+        return (f"<state>={{'FREE':[{joined_free}],'GAMER':[{joined_players}],'TURN':{self.game.turn.name.lower()},"
+                f"'CHIPS':[{self.game.players[0].remaining_pieces}, {self.game.players[1].remaining_pieces}]}}")
 
