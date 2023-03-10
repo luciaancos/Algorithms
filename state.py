@@ -68,6 +68,11 @@ class State:
 
         for init_pos in self.players[self.game.turn.value]:
             for free_pos in self.free_pieces:
+                # This check avoid making an useless copy of MillGame when init_pos is not adjacent to
+                # free_pos
+                if not self.game.board.are_adjacent(*init_pos, *free_pos):
+                    continue
+
                 game_copy = copy.deepcopy(self.game)
                 try:
                     game_copy.move(*init_pos, *free_pos)

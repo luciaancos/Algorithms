@@ -19,7 +19,7 @@ from enum import Enum, auto
 from dataclasses import dataclass, field
 from typing import Optional
 
-from board import CELLS_PER_RING, RINGS, Board, CellState
+from board import ALL_BOARD_POSITIONS, CELLS_PER_RING, RINGS, Board, CellState
 from mill_game_exceptions import (
     MillGameException,
     InvalidStateException,
@@ -296,20 +296,9 @@ class MillGame:
     def all_pieces_form_mill(self, player: Player) -> bool:
         """ Returns whether a player has all their pieces being part of at least one mill """
 
-        # check corners
-        for ring in range(1, RINGS):
-            if self.board.get_cell(ring, 0) == player.associated_cell_state and not self.board.is_mill(ring, 0):
+        for pos in ALL_BOARD_POSITIONS:
+            if self.board.get_cell(*pos) == player.associated_cell_state and not self.board.is_mill(*pos):
                 return False
-
-            if self.board.get_cell(ring, 4) == player.associated_cell_state and not self.board.is_mill(ring, 4):
-                return False
-
-        # check mill across rings
-        for cell in range(1, 8, 2):
-            if (self.board.get_cell(0, cell) == player.associated_cell_state and
-                    not self.board.is_mill(0, cell)):
-                return False
-
         return True
 
     def can_move_to_any_adjacent_cell(self, player: Player) -> bool:

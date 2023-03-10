@@ -93,9 +93,9 @@ class Board:
         if ring1 == ring2 and cell_adjacent:
             return True
 
-        ring_adjacent = abs(ring1 - ring2) == 1
+        ring_adjacent = self.is_intersection(ring1, cell1) and abs(ring1 - ring2) == 1
 
-        # but if two cells are equal, we have to focus on the rings
+        # but if two cells are equal and they are in a intersection, we have to focus on the rings
         if cell1 == cell2 and ring_adjacent:
             return True
 

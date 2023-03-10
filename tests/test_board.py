@@ -48,9 +48,12 @@ class TestBoard(unittest.TestCase):
     def test_are_adjacent(self):
         board = Board()
 
-        self.assertTrue(board.are_adjacent(3, 2, 3, 3))
+        self.assertFalse(board.are_adjacent(2, 2, 2, 2))
         self.assertTrue(board.are_adjacent(2, 1, 1, 1))
         self.assertTrue(board.are_adjacent(2, 0, 2, 7))
+
+        self.assertFalse(board.are_adjacent(0, 6, 1, 6))
+        self.assertFalse(board.are_adjacent(1, 6, 0, 6))
 
     def test_is_mill_same_ring(self):
         board = Board()

@@ -24,8 +24,8 @@ class TestMillGame(unittest.TestCase):
 
     def test_from_place_to_move(self):
         game = MillGame(turn=Turn.WHITE)
-        game._players[0].remaining_pieces = 1
-        game._players[1].remaining_pieces = 1
+        game.players[0].remaining_pieces = 1
+        game.players[1].remaining_pieces = 1
 
         game.place(0, 0)
         self.assertEqual(game.mode, GameMode.PLACE)
@@ -88,8 +88,8 @@ class TestMillGame(unittest.TestCase):
         game = MillGame(turn=Turn.WHITE)
         game.mode = GameMode.MOVE
         game.has_to_delete = True
-        game._players[0].alive_pieces = 3
-        game._players[1].alive_pieces = 3
+        game.players[0].alive_pieces = 3
+        game.players[1].alive_pieces = 3
 
         game.board.buff[0] = CellState.WHITE
         game.board.buff[1] = CellState.WHITE
