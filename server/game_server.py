@@ -2,8 +2,7 @@ import socketserver
 import logging
 import threading
 
-import packet
-from packet import Message
+from packet import Message, MessageSocket
 from game_manager import GameManager
 
 logger = logging.getLogger(__name__)
@@ -17,12 +16,17 @@ class ThreadedTCPRequestHandler(socketserver.BaseRequestHandler):
 
     game_manager = GameManager()
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.msg_socket = MessageSocket(self.request)
+
     def handle_message(self, msg: Message):
         pass
 
     def handle(self):
         while True:
-            msg = packet.recv_from_socket(self.request)
+            msg = self.msg_socket.recv()
             if msg is None:
                 break
             logger.debug(

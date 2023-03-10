@@ -49,23 +49,41 @@ class Message:
 
         return struct.pack(HEADER_FORMAT, self.msg_type.value, len(payload)) + payload
 
-def recv_from_socket_exact(socket: socket.socket, length: int) -> Optional[bytes]:
-    data = b""
-    while len(data) != length:
-        new_data = socket.recv(length - len(data))
-        if new_data == b"":
+
+class MessageSocket:
+    """ Wrapper for a socket which only sends or recieve messages """
+
+    def __init__(self, socket: socket.socket):
+        self.socket = socket
+
+    def recv_exact(self, length: int) -> Optional[bytes]:
+        """ Exactly receive 'length' bytes. The function blocks until it the socket has
+        received at least 'length' since the first time the function is called if blocking 
+        semantics are employed """
+
+        data = b""
+        while len(data) != length:
+            new_data = self.socket.recv(length - len(data))
+            if new_data == b"":
+                return None
+            data += new_data
+        return data
+
+    def recv(self) -> Optional[Message]:
+        """ Reads exactly one message. The function blocks until a message is read """
+
+        header = self.recv_exact(HEADER_LEN)
+        if header is None:
             return None
-        data += new_data
-    return data
+        msg_type, length = struct.unpack(HEADER_FORMAT, header)
 
-def recv_from_socket(socket: socket.socket) -> Optional[Message]:
-    header = recv_from_socket_exact(socket, HEADER_LEN)
-    if header is None:
-        return None
-    msg_type, length = struct.unpack(HEADER_FORMAT, header)
+        payload = self.recv_exact(length)
+        if payload is None:
+            return None
 
-    payload = recv_from_socket_exact(socket, length)
-    if payload is None:
-        return None
+        return Message(MessageType(msg_type), json.loads(payload))
 
-    return Message(MessageType(msg_type), json.loads(payload))
+    def send(self, msg: Message):
+        """ Sends the message via the underlying socket """
+
+        self.socket.sendall(msg.to_bytes())
