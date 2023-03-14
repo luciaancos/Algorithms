@@ -1,8 +1,8 @@
 import logging
-import threading
+import asyncio
 import sys
 
-from game_server import ThreadedTCPServer, ThreadedTCPRequestHandler
+from game_server import GameServer
 
 logging.basicConfig(
     level=logging.DEBUG,
@@ -11,7 +11,8 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
-if __name__ == "__main__":
+
+async def main():
     if len(sys.argv) == 2:
         port = int(sys.argv[1])
     else:
@@ -19,11 +20,10 @@ if __name__ == "__main__":
         port = 0
 
     # Note: some people think that listening on all interfaces is a bad practice
-    server = ThreadedTCPServer(("", port), ThreadedTCPRequestHandler)
+    server = GameServer()
+    await server.start_server("", port)
 
-    with server:
-        ip, port = server.server_address
-        logger.info(f"Server running on {ip}:{port}")
 
-        server_thread = threading.Thread(target=server.serve_forever)
-        server_thread.start()
+if __name__ == "__main__":
+    # TODO: Do not show the whole traceback when pressing Ctrl+C
+    asyncio.run(main())

@@ -12,6 +12,8 @@ The bytes are in network order (big-endian) and the json is UTF-8 encoded
 """
 
 from __future__ import annotations
+from asyncio.exceptions import IncompleteReadError
+import logging
 
 from enum import Enum
 from typing import TYPE_CHECKING, Any, Optional
@@ -19,8 +21,10 @@ from dataclasses import dataclass
 import struct
 import json
 
+logger = logging.getLogger(__name__)
+
 if TYPE_CHECKING:
-    import socket
+    from asyncio import StreamReader, StreamWriter
 
 
 # The size, in bytes, of the length field of the packet
@@ -50,40 +54,38 @@ class Message:
         return struct.pack(HEADER_FORMAT, self.msg_type.value, len(payload)) + payload
 
 
-class MessageSocket:
-    """ Wrapper for a socket which only sends or recieve messages """
+class StreamSocket:
 
-    def __init__(self, socket: socket.socket):
-        self.socket = socket
+    def __init__(self, reader: StreamReader, writer: StreamWriter):
+        self.reader = reader
+        self.writer = writer
+        self.peername = writer.get_extra_info("peername")
 
-    def recv_exact(self, length: int) -> Optional[bytes]:
-        """ Exactly receive 'length' bytes. The function blocks until it the socket has
-        received at least 'length' since the first time the function is called if blocking 
-        semantics are employed """
+    async def send_msg(self, msg: Message):
+        """ Sends the message via the underlying writer """
 
-        data = b""
-        while len(data) != length:
-            new_data = self.socket.recv(length - len(data))
-            if new_data == b"":
-                return None
-            data += new_data
-        return data
+        self.writer.write(msg.to_bytes())
+        await self.writer.drain()
 
-    def recv(self) -> Optional[Message]:
+    async def recv_msg(self) -> Optional[Message]:
         """ Reads exactly one message. The function blocks until a message is read """
 
-        header = self.recv_exact(HEADER_LEN)
-        if header is None:
+        header = await self._recv_exact(HEADER_LEN)
+        if header == b"":
             return None
+
         msg_type, length = struct.unpack(HEADER_FORMAT, header)
-
-        payload = self.recv_exact(length)
-        if payload is None:
+        payload = await self._recv_exact(length)
+        if payload == b"":
             return None
 
-        return Message(MessageType(msg_type), json.loads(payload))
+        return Message(msg_type, json.loads(payload))
 
-    def send(self, msg: Message):
-        """ Sends the message via the underlying socket """
+    async def _recv_exact(self, num: int) -> bytes:
+        """ Read exactly num bytes. If the client disconnects, it returns the empty byte string """
 
-        self.socket.sendall(msg.to_bytes())
+        try:
+            return await self.reader.readexactly(num)
+        except IncompleteReadError as exc:
+            logger.debug(f"Client {self.peername} disconneted. Raised: '{exc}'")
+            return b""

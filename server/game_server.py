@@ -1,34 +1,43 @@
-import socketserver
-import logging
-import threading
+from __future__ import annotations
 
-from packet import Message, MessageSocket
+import logging
+import asyncio
+from typing import TYPE_CHECKING
+
+from packet import StreamSocket
 from game_manager import GameManager
+
+if TYPE_CHECKING:
+    from asyncio import StreamReader, StreamWriter
+
 
 logger = logging.getLogger(__name__)
 
 
-class ThreadedTCPServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
-    pass
+class GameServer:
 
+    def __init__(self):
+        self.game_manager = GameManager()
 
-class ThreadedTCPRequestHandler(socketserver.BaseRequestHandler):
+    async def start_server(self, host: str, port: int):
+        server = await asyncio.start_server(self.handle_connection, host, port)
 
-    game_manager = GameManager()
+        # TODO: this information should be obtained from the server object. Right?
+        logger.debug(f"Running server on {host}:{port}")
+        async with server:
+            await server.serve_forever()
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    async def handle_connection(self, reader: StreamReader, writer: StreamWriter):
+        # FIXME: exceptions may be ignored inside a task. To handle this, we either await on the
+        # task or handle the exception inside of it. In this case, I don't think the exception
+        # will get ignored because this happens when we keep a reference for the task and I
+        # think that is not done.
 
-        self.msg_socket = MessageSocket(self.request)
+        # TODO: should I close the connection if the other end has already done it? 
 
-    def handle_message(self, msg: Message):
-        pass
+        socket = StreamSocket(reader, writer)
+        logger.info(f"Connection made from {socket.peername}")
 
-    def handle(self):
-        while True:
-            msg = self.msg_socket.recv()
-            if msg is None:
-                break
-            logger.debug(
-                f"Received {msg} from {self.request.getpeername()} on thread {threading.current_thread().name}")
-            self.handle_message(msg)
+        while (msg := await socket.recv_msg()) is not None:
+            print(socket.peername, msg)
+
