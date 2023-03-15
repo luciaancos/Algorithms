@@ -12,3 +12,11 @@ class InvalidStateException(MillGameException):
 
 class InvalidMoveException(MillGameException):
     """ Raised when the mill game board wants to be altered in a non conformant way with the rules """
+
+class InvalidJSONFormatException(Exception):
+    """Raised when a string being encoded/decoded as JSON is not formatted
+    correctly as JSON."""
+
+class InvalidSucesorFormatException(Exception):
+    """Raised when a dictionary obtained with JSON functions is not
+    formatted correctly as a successor."""

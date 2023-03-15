@@ -1,11 +1,12 @@
 import json
 from state import State, Sucesor, Move
-from board import CellState, Board
-from game import MillGame, Player
+from mill_game_exceptions import (
+    InvalidJSONFormatException,
+    InvalidSucesorFormatException
+)
 
-class InvalidJSONFormat(Exception):
-    """Raised when a string being encoded/decoded as JSON is not formatted
-    correctly as JSON."""
+STATE_KEYS = ["FREE", "GAMER", "TURN", "CHIPS"]
+MOVE_KEYS = ["POS_INIT", "NEXT_POS", "KILL"]
 
 class JSONHandler():
     """Class which handles serialization and deserialization from JSON strings."""
@@ -27,10 +28,25 @@ class JSONHandler():
         try:
             json_dict = json.loads(sucesor_str)
         except json.JSONDecodeError:
-            raise InvalidJSONFormat(
+            raise InvalidJSONFormatException(
                 "The string received is not in the correct JSON format."
                 )
+        if not self._is_correct_sucesor(json_dict):
+            raise InvalidSucesorFormatException(
+                "The string received is not in the correct successor format."
+            )
         return json_dict
+    
+    def _is_correct_sucesor(self, sucesor_dict: dict) -> bool:
+        if len(sucesor_dict) != 3:
+            return False
+        values = list(sucesor_dict.values())
+        if (isinstance(sucesor_dict, dict) and len(sucesor_dict) == 3
+        and isinstance(values[0], dict) and all(key in values[0] for key in STATE_KEYS)
+        and isinstance(values[1], dict) and all(key in values[1] for key in MOVE_KEYS)
+        and isinstance(values[2], dict) and all(key in values[2] for key in STATE_KEYS)):
+            return True
+        return False
 
     def _move_to_json(self, move: Move) -> str:
         """Turns a given move into a string representing it in JSON format."""
