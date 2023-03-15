@@ -46,12 +46,20 @@ class MessageType(Enum):
 @dataclass
 class Message:
     msg_type: MessageType
-    payload: dict[Any, Any]
+    _payload: Optional[dict[Any, Any]] = None
 
     def to_bytes(self) -> bytes:
-        payload = json.dumps(self.payload).encode()
+        if self._payload is not None:
+            payload = json.dumps(self._payload).encode()
+            return struct.pack(HEADER_FORMAT, self.msg_type.value, len(payload)) + payload
+        else:
+            return struct.pack(HEADER_FORMAT, self.msg_type.value, 0)
 
-        return struct.pack(HEADER_FORMAT, self.msg_type.value, len(payload)) + payload
+    @property
+    def payload(self) -> dict[Any, Any]:
+        if self._payload is not None:
+            return self._payload
+        raise ValueError(f"{self.msg_type.name} does not have a payload")
 
 
 class StreamSocket:
@@ -59,7 +67,8 @@ class StreamSocket:
     def __init__(self, reader: StreamReader, writer: StreamWriter):
         self.reader = reader
         self.writer = writer
-        self.peername = writer.get_extra_info("peername")
+        host, port = writer.get_extra_info("peername")
+        self.peername = f"{host}:{port}"
 
     async def send_msg(self, msg: Message):
         """ Sends the message via the underlying writer """
@@ -75,11 +84,24 @@ class StreamSocket:
             return None
 
         msg_type, length = struct.unpack(HEADER_FORMAT, header)
-        payload = await self._recv_exact(length)
-        if payload == b"":
-            return None
 
-        return Message(msg_type, json.loads(payload))
+        if length != 0:
+            payload_bytes = await self._recv_exact(length)
+            if payload_bytes == b"":
+                return None
+
+            # TODO: this raises an exception if the decoded string is not valid json
+            payload = json.loads(payload_bytes)
+        else:
+            payload = None
+
+        return Message(MessageType(msg_type), payload)
+
+    async def close(self):
+        """ Closes the underlying writer """
+
+        self.writer.close()
+        await self.writer.wait_closed()
 
     async def _recv_exact(self, num: int) -> bytes:
         """ Read exactly num bytes. If the client disconnects, it returns the empty byte string """
@@ -87,5 +109,6 @@ class StreamSocket:
         try:
             return await self.reader.readexactly(num)
         except IncompleteReadError as exc:
-            logger.debug(f"Client {self.peername} disconneted. Raised: '{exc}'")
-            return b""
+            if exc.partial == b"":
+                return b""
+            raise exc

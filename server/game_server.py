@@ -4,11 +4,14 @@ import logging
 import asyncio
 from typing import TYPE_CHECKING
 
-from packet import StreamSocket
-from game_manager import GameManager
+from packet import Message, MessageType, StreamSocket
+from game_manager import Game, GameManager
+from player import Player
 
 if TYPE_CHECKING:
     from asyncio import StreamReader, StreamWriter
+
+    from packet import Message
 
 
 logger = logging.getLogger(__name__)
@@ -33,11 +36,33 @@ class GameServer:
         # will get ignored because this happens when we keep a reference for the task and I
         # think that is not done.
 
-        # TODO: should I close the connection if the other end has already done it? 
+        player = Player(StreamSocket(reader, writer))
+        logger.info(f"User connected from '{player.socket.peername}'")
 
-        socket = StreamSocket(reader, writer)
-        logger.info(f"Connection made from {socket.peername}")
+        # TODO: socket.recv_msg() may fail
+        while (msg := await player.socket.recv_msg()) is not None:
+            if (game := self.game_manager.get_active_game(player)) is not None:
+                await self.handle_game_msg(game, player, msg)
+            else:
+                await self.handle_msg(player, msg)
 
-        while (msg := await socket.recv_msg()) is not None:
-            print(socket.peername, msg)
+        await self.on_disconnect(player)
 
+    async def handle_msg(self, player: Player, msg: Message):
+        match msg.msg_type:
+            case MessageType.CREATE_GAME:
+                # TODO: check that the player is not already waiting to join a game
+                game_code = self.game_manager.add_to_waitlist(player)
+                await player.socket.send_msg(Message(MessageType.OK, {
+                    "game_code": game_code
+                }))
+
+    async def handle_game_msg(self, game: Game, player: Player, msg: Message):
+        pass
+
+    async def on_disconnect(self, player: Player):
+        # TODO: do whatever is needed to leave the server in consistent state:
+        #  - When a player which waiting disconnects
+        #  - When a player which is playing disconnects
+        logger.debug(f"User '{player.socket.peername}' has disconnected")
+        await player.socket.close()
