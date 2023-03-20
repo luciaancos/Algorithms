@@ -37,11 +37,26 @@ HEADER_LEN = LENGTH_FIELD_LEN + TYPE_FIELD_LEN
 HEADER_FORMAT = "!HI"
 
 # Constants which represent the type of packages. These are the ones placed in the type field
+
+
 class MessageType(Enum):
     CREATE_GAME = 1
     JOIN_GAME = 2
     ERROR = 3
     OK = 4
+
+    # Messages related to the game
+    GAME_OK = 5
+    MOVE = 6
+    INVALID_STATE = 7
+    FINNISH = 8
+
+    def is_game_message(self):
+        """ Return true if self is a message that should be exchange
+        when a player is in a game """
+
+        return self.value >= 5 and self.value <= 8
+
 
 @dataclass
 class Message:
