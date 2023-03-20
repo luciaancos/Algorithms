@@ -44,8 +44,11 @@ class GameServer:
         # (https://docs.python.org/3/library/exceptions.html#ConnectionError). Handle that exception
         while (msg := await player.socket.recv_msg()) is not None:
             if (game := self.game_manager.get_active_game(player)) is not None:
-                if msg.msg_type.is_game_message():
+                if msg.is_game_message():
                     await game.forward_msg(msg, player)
+                    if game.has_finished():
+                        # TODO: save the state in the database or do whatever is needed after a game has finished
+                        pass
                 else:
                     await player.socket.send_msg(Message(MessageType.ERROR, {
                         "msg": f"You cannot send a message '{msg.msg_type.value}' while you are playing"
@@ -93,9 +96,6 @@ class GameServer:
 
                 logger.info(
                     f"'{player.socket.peername}' and '{opponent_player.socket.peername}' have started playing")
-
-    async def handle_game_msg(self, game: Game, player: Player, msg: Message):
-        pass
 
     async def on_disconnect(self, player: Player):
         # TODO: do whatever is needed to leave the server in a consistent state:

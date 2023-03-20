@@ -37,8 +37,6 @@ HEADER_LEN = LENGTH_FIELD_LEN + TYPE_FIELD_LEN
 HEADER_FORMAT = "!HI"
 
 # Constants which represent the type of packages. These are the ones placed in the type field
-
-
 class MessageType(Enum):
     CREATE_GAME = 1
     JOIN_GAME = 2
@@ -50,12 +48,6 @@ class MessageType(Enum):
     MOVE = 6
     INVALID_STATE = 7
     FINNISH = 8
-
-    def is_game_message(self):
-        """ Return true if self is a message that should be exchange
-        when a player is in a game """
-
-        return self.value >= 5 and self.value <= 8
 
 
 @dataclass
@@ -69,6 +61,12 @@ class Message:
             return struct.pack(HEADER_FORMAT, self.msg_type.value, len(payload)) + payload
         else:
             return struct.pack(HEADER_FORMAT, self.msg_type.value, 0)
+
+    def is_game_message(self):
+        """ Return true if this is a message type that should be exchange
+        when a player is in a game """
+
+        return self.msg_type.value >= 6 and self.msg_type.value <= 8
 
     @property
     def payload(self) -> dict[Any, Any]:
