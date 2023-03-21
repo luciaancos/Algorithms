@@ -9,7 +9,6 @@ from game import (
     Move,
 )
 from mill_game_exceptions import MillGameException
-from board import ALL_BOARD_POSITIONS, CellState
 from collections.abc import Iterator
 
 
@@ -23,16 +22,11 @@ class State:
         self.game = game
         self.move = move
         self.parent = parent
+        game_info = self.game.get_current_game_info()
 
-        self.free_pieces = [(ring, cell) for ring, cell in ALL_BOARD_POSITIONS
-                            if game.board.get_cell(ring, cell) == CellState.EMPTY]
+        self.free_pieces = game_info.free_pieces
 
-        white_player_pieces = [(ring, cell) for ring, cell in ALL_BOARD_POSITIONS
-                               if game.board.get_cell(ring, cell) == CellState.WHITE]
-        black_player_pieces = [(ring, cell) for ring, cell in ALL_BOARD_POSITIONS
-                               if game.board.get_cell(ring, cell) == CellState.BLACK]
-
-        self.players = [white_player_pieces, black_player_pieces]
+        self.players = [game_info.white_player_pieces, game_info.black_player_pieces]
 
     def _generate_place_sucessors(self) -> Iterator[State]:
         oponent_turn = 1 - self.game.turn.value
@@ -46,6 +40,9 @@ class State:
 
             if game_copy.has_to_delete:
                 for op_pos in self.players[oponent_turn]:
+                    # TODO: it is posssible not to make an useless copy if we separate the check
+                    # and the action
+
                     remove_copy = copy.deepcopy(game_copy)
                     try:
                         remove_copy.remove(*op_pos)

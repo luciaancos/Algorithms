@@ -39,8 +39,34 @@ class GameMode(Enum):
 class Turn(Enum):
     """Represents the turn of the game in a given moment, that is, who is the
     active player."""
+
     WHITE = 0
     BLACK = 1
+
+
+@dataclass
+class GameInfo:
+    """ Information obtained from a MillGame in a specific state. Contains information which
+    is 'expensive' to calculate everytime a move is performed. """
+
+    free_pieces: list[tuple[int, int]]
+    white_player_pieces: list[tuple[int, int]]
+    black_player_pieces: list[tuple[int, int]]
+
+    @classmethod
+    def from_game(cls, game: MillGame) -> GameInfo:
+        free_pieces = [(ring, cell) for ring, cell in ALL_BOARD_POSITIONS
+                       if game.board.get_cell(ring, cell) == CellState.EMPTY]
+
+        white_player_pieces = [(ring, cell) for ring, cell in ALL_BOARD_POSITIONS
+                               if game.board.get_cell(ring, cell) == CellState.WHITE]
+
+        black_player_pieces = [(ring, cell) for ring, cell in ALL_BOARD_POSITIONS
+                               if game.board.get_cell(ring, cell) == CellState.BLACK]
+
+        return cls(free_pieces, white_player_pieces, black_player_pieces)
+
+
 
 
 @dataclass
@@ -267,6 +293,12 @@ class MillGame:
             self.has_to_delete = True
         else:
             self._change_turn()
+
+    def get_current_game_info(self) -> GameInfo:
+        """ Returns information which is expensive to be calculated every time a move which changes
+        the state is performed """
+
+        return GameInfo.from_game(self)
 
     def remove(self, ring: int, cell: int):
         """Remove a cell from the board permanently."""
