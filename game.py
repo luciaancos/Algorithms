@@ -103,9 +103,9 @@ class Move:
 
     def to_json(self) -> str:
         return json.dumps({
-            "POS_INIT": -1 if self.pos_init is None else self.pos_init[0] * 8 + self.pos_init[1] + 8,
-            "NEXT_POS": self.next_pos[0] * 8 + self.next_pos[1] + 8,
-            "KILL": -1 if self.kill is None else self.kill[0] * 8 + self.kill[1] + 8
+            "POS_INIT": -1 if self.pos_init is None else self.pos_init[0] * 8 + self.pos_init[1],
+            "NEXT_POS": self.next_pos[0] * 8 + self.next_pos[1],
+            "KILL": -1 if self.kill is None else self.kill[0] * 8 + self.kill[1]
         })
 
     def __str__(self) -> str:
@@ -124,19 +124,27 @@ class MillGame:
     chips to adjacent cells. The player who has two chips left on the board loses.
     """
 
-    def __init__(self, turn: Optional[Turn] = None):
-        """ turn is the turn of the one who starts the game. If None is given, it is chosen randomly """
+    def __init__(self, turn: Optional[Turn] = None, max_movements: Optional[int] = None):
+        """ turn is the turn of the one who starts the game. If None is given, it is chosen randomly 
+
+        max_movements is the maximum number of allowed movements before the game ends with a tie. A remove
+        is not counted as a movement
+        """
 
         self.turn = turn if turn is not None else Turn(random.randint(0, 1))
         self.mode = GameMode.PLACE
         self.has_to_delete = False
+        self.max_movements = max_movements
         self.board = Board()
 
         self.players = [Player(CellState.WHITE), Player(CellState.BLACK)]
 
+        # Counter for the movements
+        self.movements_made = 0
+
     @property
     def winner(self) -> Optional[Turn]:
-        """ Return the turn who has won the game once the game has finished. If the game is a tie,
+        """ Return the turn of the player who has won the game once the game has finished. If the game is a tie,
         this will be None.
 
         If this property is tried to be accessed when the game has not finished, an exception is raised """
@@ -145,7 +153,22 @@ class MillGame:
             raise MillGameException(
                 "You cannot access the winner if game has not finished")
 
-        return self.turn
+        if self.is_tie():
+            return None
+        else:
+            return self.turn
+
+    @classmethod
+    def from_json(cls):
+        raise NotImplementedError
+
+    def to_json(self):
+        raise NotImplementedError
+
+    def is_tie(self) -> bool:
+        """ Returns true if the game is a tie """
+
+        return self.max_movements is not None and self.movements_made == self.max_movements
 
     def apply_move(self, move: Move):
         """ Apply the given move """
@@ -237,6 +260,7 @@ class MillGame:
         if self.current_player().remaining_pieces == 0 and self.other_player().remaining_pieces == 0:
             self.mode = GameMode.MOVE
 
+        self.movements_made += 1
         self._change_turn()
 
     def move_and_remove(self, ring1: int, cell1: int, ring2: int, cell2: int, rem_ring: int, rem_cell: int):
@@ -271,6 +295,7 @@ class MillGame:
             raise InvalidMoveException(
                 "The move action was correct but not the remove one")
 
+        self.movements_made += 1
         self._change_turn()
 
     def place(self, ring: int, cell: int):
@@ -286,6 +311,7 @@ class MillGame:
         if self.current_player().remaining_pieces == 0 and self.other_player().remaining_pieces == 0:
             self.mode = GameMode.MOVE
 
+        self.movements_made += 1
         if self.board.is_mill(ring, cell):
             self.has_to_delete = True
         else:
@@ -300,6 +326,7 @@ class MillGame:
         self.board.put_cell(
             ring2, cell2, self.current_player().associated_cell_state)
 
+        self.movements_made += 1
         if self.board.is_mill(ring2, cell2):
             self.has_to_delete = True
         else:
@@ -443,7 +470,7 @@ class MillGame:
         # the configuration is such that the other player cannot move to any adjacent cell.
         # In that case, game is lost
 
-        if self.mode == GameMode.MOVE and not self.can_move_to_any_adjacent_cell(self.other_player()):
+        if self.is_tie() or (self.mode == GameMode.MOVE and not self.can_move_to_any_adjacent_cell(self.other_player())):
             self.mode = GameMode.FINISHED
         else:
             self.turn = Turn(1 - self.turn.value)
