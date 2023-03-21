@@ -73,6 +73,8 @@ class State:
                 if not self.game.board.are_adjacent(*init_pos, *free_pos):
                     continue
 
+                # TODO: it is posssible not to make an useless copy if we separate the check
+                # and the action
                 game_copy = copy.deepcopy(self.game)
                 try:
                     game_copy.move(*init_pos, *free_pos)
