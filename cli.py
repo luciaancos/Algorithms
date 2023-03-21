@@ -53,7 +53,7 @@ def main():
                 if game.has_to_delete:
                     delete_chip(game)
 
-    print('CONGRATULATIONS ', game.turn.name, ' PLAYER, YOU HAVE WON')
+    print('CONGRATULATIONS ', game.winner.name, ' PLAYER, YOU HAVE WON')
     print('End of the game...')
 
 if __name__ == "__main__":

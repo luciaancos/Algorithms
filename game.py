@@ -67,8 +67,6 @@ class GameInfo:
         return cls(free_pieces, white_player_pieces, black_player_pieces)
 
 
-
-
 @dataclass
 class Player:
     associated_cell_state: CellState
@@ -135,6 +133,19 @@ class MillGame:
         self.board = Board()
 
         self.players = [Player(CellState.WHITE), Player(CellState.BLACK)]
+
+    @property
+    def winner(self) -> Optional[Turn]:
+        """ Return the turn who has won the game once the game has finished. If the game is a tie,
+        this will be None.
+
+        If this property is tried to be accessed when the game has not finished, an exception is raised """
+
+        if self.mode != GameMode.FINISHED:
+            raise MillGameException(
+                "You cannot access the winner if game has not finished")
+
+        return self.turn
 
     def apply_move(self, move: Move):
         """ Apply the given move """
