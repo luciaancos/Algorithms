@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import random
 
 from typing import Optional
 from game import (
@@ -26,7 +27,8 @@ class State:
 
         self.free_pieces = game_info.free_pieces
 
-        self.players = [game_info.white_player_pieces, game_info.black_player_pieces]
+        self.players = [game_info.white_player_pieces,
+                        game_info.black_player_pieces]
 
     def _generate_place_sucessors(self) -> Iterator[State]:
         oponent_turn = 1 - self.game.turn.value
@@ -95,17 +97,30 @@ class State:
                                 kill=None)
                     yield State(game_copy, move, self)
 
-    def successors(self) -> Iterator[State]:
-        """ Returns a generator with all the successors states of the current one """ 
+    def successors(self, *, shuffle=False) -> Iterator[State]:
+        """ Returns a generator with all the successors states of the current one. 
+        If shuffle is True, the generator will generate the states in a random order. """
 
         if self.game.mode == GameMode.PLACE:
+            if shuffle:
+                self._shuffle_indices()
             yield from self._generate_place_sucessors()
         elif self.game.mode == GameMode.MOVE:
+            if shuffle:
+                self._shuffle_indices()
             yield from self._generate_move_sucessors()
 
+    def _shuffle_indices(self):
+        white_pieces, black_pieces = self.players
+
+        random.shuffle(self.free_pieces)
+        random.shuffle(white_pieces)
+        random.shuffle(black_pieces)
+
     def __str__(self):
-        joined_free = ",".join(map(str, [ring * 8 + cell for ring, cell in self.free_pieces]))
-        joined_players = ",".join(map(str, [[ring * 8 + cell for ring, cell in player] for player in self.players]))
+        joined_free = ",".join(
+            map(str, [ring * 8 + cell for ring, cell in self.free_pieces]))
+        joined_players = ",".join(
+            map(str, [[ring * 8 + cell for ring, cell in player] for player in self.players]))
         return (f"<state>={{'FREE':[{joined_free}],'GAMER':[{joined_players}],'TURN':{self.game.turn.name.lower()},"
                 f"'CHIPS':[{self.game.players[0].remaining_pieces}, {self.game.players[1].remaining_pieces}]}}")
-
