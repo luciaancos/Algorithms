@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Optional
 import random
+from game import GameMode
 
 from state import State
 
@@ -38,12 +39,15 @@ class MoveAlgorithm(ABC):
         if state is None:
             return None
 
-        return state.action
+        return state.move
 
     @abstractmethod
-    def _next_state(self, game: MillGame):
-        """ Returns the next state of the game chosen by this algorithm. This method is not meant to be called directly.
-        This is what should be overriden by every subclass of MoveAlgorithm """
+    def _next_state(self, game: MillGame) -> Optional[State]:
+        """ Returns the next state of the game chosen by this algorithm. If there are no available state,
+        then return None
+
+        This method is not meant to be called directly. This is what should be overriden 
+        by every subclass of MoveAlgorithm """
 
 
 class RandomMove(MoveAlgorithm):
@@ -52,12 +56,11 @@ class RandomMove(MoveAlgorithm):
     def _next_state(self, game: MillGame) -> Optional[State]:
         """ Returns the next state of the game chosen by this algorithm """
 
-        state = State(game)
-        sucessors = list(state.successors())
-        if not sucessors:
+        if game.mode == GameMode.FINISHED:
             return None
 
-        return random.choice(sucessors)
+        # A StopIterationError won't be thrown because that only happens when the game state
+        return next(State(game).successors(shuffle=True))
 
 
 class MinimaxMove(MoveAlgorithm):
