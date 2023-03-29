@@ -1,8 +1,11 @@
 from abc import ABC, abstractmethod
+import copy
 from typing import TYPE_CHECKING, Optional
 import random
 
 from state import State
+from montecarlo_node import MontecarloNode
+from game import GameMode
 
 if TYPE_CHECKING:
     from game import Move, MillGame
@@ -61,3 +64,64 @@ class MinimaxMove(MoveAlgorithm):
 
     def next_move(self, game: MillGame) -> Optional[Move]:
         raise NotImplementedError
+
+
+class MonteCarloMove(MoveAlgorithm):
+    """ This algorithm chooses a move according to the monte carlo algorithm """
+    def __init__(self, credits: int) -> None:
+        self.montecarlo_tree = None
+        self.credits = credits
+
+    def next_move(self, game: MillGame) -> Optional[Move]:
+        self.montecarlo_tree = MonteCarloTree(game)
+        remaining_credits = self.credits
+        while remaining_credits != 0:
+            self.montecarlo_tree.run_iteration()
+            remaining_credits -=1 
+        return self.montecarlo_tree.best_state().action 
+        
+
+class MonteCarloTree:
+
+    def __init__(self, game:MillGame) -> None:
+        state = State(game)
+        self.root = MontecarloNode(state)
+        self.current_turn = self.root.state.game.turn
+
+    def best_state(self):
+        return self.root.get_best_child().state
+
+    def run_iteration(self):
+        selected_node = self.tree_policy()
+        reward = self.default_policy(selected_node)
+        self.backup(selected_node,reward)
+
+
+    def tree_policy(self):
+        current_node = self.root
+        while not current_node.is_terminal():
+            if (next_child:= current_node.next_child()) is not None: 
+                return next_child
+            else:
+                node = node.get_best_child()
+            
+    def default_policy(self, node:MontecarloNode):
+        game = copy.deepcopy(node.state.game)
+        move = RandomMove()
+        while game.mode != GameMode.FINISHED:
+            move.perform_move(game)
+
+        if game.winner is None:
+            return 0
+        elif game.winner== self.current_turn:
+            return 1
+        else:
+            return -1
+    
+    def backup(self, node:MontecarloNode, reward: int):
+        while node is not None:
+            node.visits+=1
+            node.accumulated_reward+= reward
+            reward = -reward
+            node = node.parent
+
