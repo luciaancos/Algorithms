@@ -101,6 +101,10 @@ class State:
         """ Returns a generator with all the successors states of the current one. 
         If shuffle is True, the generator will generate the states in a random order. """
 
+        # TODO: right now, the order is not uniformly random. If the consumed state has been reached
+        # using a kill move then the next one will also be reached using the same kind of move if it exists.
+        # This will continue until all the kill moves have been consumed
+
         if self.game.mode == GameMode.PLACE:
             if shuffle:
                 self._shuffle_indices()

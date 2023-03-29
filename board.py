@@ -80,7 +80,7 @@ class Board:
             if adj_ring < 0 or adj_ring >= RINGS or adj_cell < 0 or adj_cell >= CELLS_PER_RING:
                 continue
 
-            if self.get_cell(adj_ring, adj_cell) == CellState.EMPTY:
+            if self.are_adjacent(ring, cell, adj_ring, adj_cell) and self.get_cell(adj_ring, adj_cell) == CellState.EMPTY:
                 return True
 
         return False

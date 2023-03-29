@@ -371,7 +371,7 @@ class MillGame:
                 return False
         return True
 
-    def can_move_to_any_adjacent_cell(self, player: Player) -> bool:
+    def can_move_to_an_adjacent_cell(self, player: Player) -> bool:
         """ Checks whether there exist one piece from 'player' which can be moved to an adjacent cell """
 
         # TODO: this can be improved if we don't have traverse the board in order to find 'player's pieces.
@@ -470,7 +470,7 @@ class MillGame:
         # the configuration is such that the other player cannot move to any adjacent cell.
         # In that case, game is lost
 
-        if self.is_tie() or (self.mode == GameMode.MOVE and not self.can_move_to_any_adjacent_cell(self.other_player())):
+        if self.is_tie() or (self.mode == GameMode.MOVE and not self.can_move_to_an_adjacent_cell(self.other_player())):
             self.mode = GameMode.FINISHED
         else:
             self.turn = Turn(1 - self.turn.value)

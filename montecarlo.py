@@ -56,9 +56,7 @@ class MontecarloNode:
     def get_best_child(self) -> MontecarloNode:
         """ Returns the child node with the highest uct value """
 
-        _, child = max([(child.uct_value(), child)
-                       for child in self.expanded_children])
-        return child
+        return max([child for child in self.expanded_children], key=MontecarloNode.uct_value)
 
     def is_terminal(self) -> bool:
         """ Returns true if this is a terminal state. A terminal state is one which does not have
@@ -74,16 +72,15 @@ class MonteCarloTree:
         self.root = MontecarloNode(state)
         self.current_turn = self.root.state.game.turn
 
-    def best_state(self) -> State:
-        """ Returns the next state with the highest average reward. In order to call this method, run_iteration() must have
+    def best_node(self) -> MontecarloNode:
+        """ Returns the node with the highest average reward. In order to call this method, run_iteration() must have
         been called at least one so that the root has at least one children. Otherwise, a ValueErrorException
         is raised. """
 
         if len(self.root.expanded_children) == 0:
             raise ValueError("The root does not have any children")
 
-        _, child = max([(child.avg_reward(), child) for child in self.root.expanded_children])
-        return child.state
+        return max([child for child in self.root.expanded_children], key=MontecarloNode.avg_reward)
 
     def run_iteration(self):
         """ Run the sequence of steps required by the Montecarlo search algorithm to add a node
@@ -148,4 +145,4 @@ class MonteCarloMove(MoveAlgorithm):
         for _ in range(self.iterations):
             self.montecarlo_tree.run_iteration()
 
-        return self.montecarlo_tree.best_state().move  # type: ignore
+        return self.montecarlo_tree.best_node().state

@@ -31,7 +31,7 @@ def main():
                 except MillGameException as error:
                     print('\nERROR:', error)
 
-                if game.has_to_delete:
+                while game.has_to_delete:
                     delete_chip(game)
 
             case GameMode.MOVE:
@@ -50,10 +50,13 @@ def main():
                 except MillGameException as error:
                     print('\nERROR:', error)
 
-                if game.has_to_delete:
+                while game.has_to_delete:
                     delete_chip(game)
 
-    print('CONGRATULATIONS ', game.winner.name, ' PLAYER, YOU HAVE WON')
+    if game.winner is None:
+        print(f"{game.max_movements} movements have been made so the game is considered a tie")
+    else:
+        print(f"CONGRATULATIONS {game.winner.name} PLAYER, YOU HAVE WON")
     print('End of the game...')
 
 if __name__ == "__main__":
