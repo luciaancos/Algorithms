@@ -4,7 +4,6 @@ from board import Board, CellState
 
 
 class TestBoard(unittest.TestCase):
-
     def test_get_cell(self):
         buff = [CellState.EMPTY] * 24
 

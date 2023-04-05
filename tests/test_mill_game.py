@@ -1,14 +1,10 @@
 import unittest
 from board import CellState
 
-from game import (GameMode,
-                  MillGame,
-                  InvalidMoveException,
-                  Turn)
+from game import GameMode, MillGame, InvalidMoveException, Turn
 
 
 class TestMillGame(unittest.TestCase):
-
     def test_place_invalid_move(self):
         game = MillGame(turn=Turn.WHITE)
         game.place(0, 0)
@@ -103,7 +99,6 @@ class TestMillGame(unittest.TestCase):
 
         self.assertEqual(game.mode, GameMode.FINISHED)
         self.assertEqual(game.turn, Turn.WHITE)
-
 
     def test_finish_change_turn(self):
         game = MillGame(turn=Turn.WHITE)

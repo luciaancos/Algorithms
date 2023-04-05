@@ -1,7 +1,8 @@
 """ This module contains utilities related to the network packet format. 
 
-The format is very simple. The first 2 bytes correspond to the message type. The next 4 bytes encodes the length 
-in bytes of the json that follows it. This is not the most efficient design but it is very flexible.
+The format is very simple. The first 2 bytes correspond to the message type. The
+next 4 bytes encodes the length in bytes of the json that follows it. This is
+not the most efficient design but it is very flexible.
 
 2 bytes    4 bytes          LENGTH bytes
 ------ ------------ ------------------------------
@@ -36,6 +37,7 @@ TYPE_FIELD_LEN = 2
 HEADER_LEN = LENGTH_FIELD_LEN + TYPE_FIELD_LEN
 HEADER_FORMAT = "!HI"
 
+
 # Constants which represent the type of packages. These are the ones placed in the type field
 class MessageType(Enum):
     CREATE_GAME = 1
@@ -58,13 +60,14 @@ class Message:
     def to_bytes(self) -> bytes:
         if self._payload is not None:
             payload = json.dumps(self._payload).encode()
-            return struct.pack(HEADER_FORMAT, self.msg_type.value, len(payload)) + payload
-        else:
-            return struct.pack(HEADER_FORMAT, self.msg_type.value, 0)
+            return (
+                struct.pack(HEADER_FORMAT, self.msg_type.value, len(payload)) + payload
+            )
+        return struct.pack(HEADER_FORMAT, self.msg_type.value, 0)
 
     def is_game_message(self):
-        """ Return true if this is a message type that should be exchange
-        when a player is in a game """
+        """Return true if this is a message type that should be exchange
+        when a player is in a game"""
 
         return self.msg_type.value >= 6 and self.msg_type.value <= 8
 
@@ -76,7 +79,6 @@ class Message:
 
 
 class StreamSocket:
-
     def __init__(self, reader: StreamReader, writer: StreamWriter):
         self.reader = reader
         self.writer = writer
@@ -84,13 +86,13 @@ class StreamSocket:
         self.peername = f"{host}:{port}"
 
     async def send_msg(self, msg: Message):
-        """ Sends the message via the underlying writer """
+        """Sends the message via the underlying writer"""
 
         self.writer.write(msg.to_bytes())
         await self.writer.drain()
 
     async def recv_msg(self) -> Optional[Message]:
-        """ Reads exactly one message. The function blocks until a message is read """
+        """Reads exactly one message. The function blocks until a message is read"""
 
         header = await self._recv_exact(HEADER_LEN)
         if header == b"":
@@ -111,13 +113,13 @@ class StreamSocket:
         return Message(MessageType(msg_type), payload)
 
     async def close(self):
-        """ Closes the underlying writer """
+        """Closes the underlying writer"""
 
         self.writer.close()
         await self.writer.wait_closed()
 
     async def _recv_exact(self, num: int) -> bytes:
-        """ Read exactly num bytes. If the client disconnects, it returns the empty byte string """
+        """Read exactly num bytes. If the client disconnects, it returns the empty byte string"""
 
         try:
             return await self.reader.readexactly(num)

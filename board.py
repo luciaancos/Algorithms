@@ -1,13 +1,15 @@
 from enum import Enum, auto
 from typing import Optional
 
-from mill_game_exceptions import InvalidBoardPosition 
+from mill_game_exceptions import InvalidBoardPosition
 
 CELLS_PER_RING = 8
 RINGS = 3
 BOARD_SIZE = CELLS_PER_RING * RINGS
 
-ALL_BOARD_POSITIONS = [(ring, cell) for ring in range(RINGS) for cell in range(CELLS_PER_RING)]
+ALL_BOARD_POSITIONS = [
+    (ring, cell) for ring in range(RINGS) for cell in range(CELLS_PER_RING)
+]
 
 
 class CellState(Enum):
@@ -29,23 +31,21 @@ class CellState(Enum):
 
 
 class Board:
-    """
-    Represents the standard board for the "Nine men's morris" game.
+    """Represents the standard board for the "Nine men's morris" game.
 
-    It contains three rings, each composed of eight cells. The outer ring is
-    identified with the number 0 and the most inner one, with 2. For the cells,
-    the one at the upper left corner is identified with the number 0. The
-    identifier of the next cells increases by one in clockwise motion, so the
-    cell to the right of cell zero is one and so on until the last one, which
-    is seven.
+    It contains three rings, each composed of eight cells. The outer
+    ring is identified with the number 0 and the most inner one, with 2.
+    For the cells, the one at the upper left corner is identified with
+    the number 0. The identifier of the next cells increases by one in
+    clockwise motion, so the cell to the right of cell zero is one and
+    so on until the last one, which is seven.
     """
 
     def __init__(self, buff: Optional[list[CellState]] = None):
         """Create an instance of the Board class."""
         # buff is a 24 sized list which represents the board. If None is given,
         # an empty board will be generated
-        self.buff = buff if buff is not None else [
-            CellState.EMPTY] * BOARD_SIZE
+        self.buff = buff if buff is not None else [CellState.EMPTY] * BOARD_SIZE
 
         if len(self.buff) > BOARD_SIZE:
             raise ValueError(
@@ -58,8 +58,10 @@ class Board:
         return self.buff[idx]
 
     def put_cell(self, ring: int, cell: int, state: CellState):
-        """Change the state of a cell located in a specific ring. The value of
-        the cell is completely overriden."""
+        """Change the state of a cell located in a specific ring.
+
+        The value of the cell is completely overriden.
+        """
         idx = self._get_cell_idx(ring, cell)
         self.buff[idx] = state
 
@@ -68,19 +70,26 @@ class Board:
         self.put_cell(ring, cell, CellState.EMPTY)
 
     def is_intersection(self, ring: int, cell: int) -> bool:
-        """Return whether the cell in a specific has a connection with an
-        inner or outer ring."""
+        """Return whether the cell in a specific has a connection with an inner
+        or outer ring."""
         return cell % 2 == 1
 
     def is_any_adjacent_cell_empty(self, ring: int, cell: int) -> bool:
-        """ Checks whether at least one adjacent to (ring, cell) is empty """
-
+        """Checks whether at least one adjacent to (ring, cell) is empty."""
         for i, j in ((1, 0), (-1, 0), (0, 1), (0, -1)):
             adj_ring, adj_cell = ring + i, cell + j
-            if adj_ring < 0 or adj_ring >= RINGS or adj_cell < 0 or adj_cell >= CELLS_PER_RING:
+            if (
+                adj_ring < 0
+                or adj_ring >= RINGS
+                or adj_cell < 0
+                or adj_cell >= CELLS_PER_RING
+            ):
                 continue
 
-            if self.are_adjacent(ring, cell, adj_ring, adj_cell) and self.get_cell(adj_ring, adj_cell) == CellState.EMPTY:
+            if (
+                self.are_adjacent(ring, cell, adj_ring, adj_cell)
+                and self.get_cell(adj_ring, adj_cell) == CellState.EMPTY
+            ):
                 return True
 
         return False
@@ -128,9 +137,12 @@ class Board:
         return False
 
     def _check_same_in_ring(self, check_state: CellState, ring: int, cell: int) -> bool:
-        """Check whether there is a mill starting at a corner. It is checked
+        """Check whether there is a mill starting at a corner.
+
+        It is checked
         in clockwise motion.
-        NOTE: This method does NOT check whether the cell is a corner."""
+        NOTE: This method does NOT check whether the cell is a corner.
+        """
         for i in range(3):
             if check_state != self.get_cell(ring, (cell + i) % CELLS_PER_RING):
                 return False
@@ -139,7 +151,9 @@ class Board:
 
     def _check_across_rings(self, check_state: CellState, cell: int) -> bool:
         """Check whether there is a mill across ring which contains cell.
-        NOTE: This method does NOT check whether a cell is in a intersection."""
+
+        NOTE: This method does NOT check whether a cell is in a intersection.
+        """
         for ring in range(RINGS):
             if check_state != self.get_cell(ring, cell):
                 return False
@@ -149,7 +163,7 @@ class Board:
     def _get_cell_idx(self, ring: int, cell: int) -> int:
         """Return the index in the board from a given cell."""
         if ring < 0 or ring >= RINGS:
-            raise  InvalidBoardPosition(
+            raise InvalidBoardPosition(
                 f"The ring must be between 0 and {RINGS-1}, but {ring} was given \n"
             )
 

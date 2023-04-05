@@ -9,6 +9,6 @@ if TYPE_CHECKING:
 
 @dataclass
 class Player:
-    """ Contains extra information appart for a user, appart from the socket """
+    """Contains extra information appart for a user, appart from the socket"""
 
     socket: StreamSocket

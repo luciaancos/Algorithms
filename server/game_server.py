@@ -4,13 +4,12 @@ import logging
 import asyncio
 from typing import TYPE_CHECKING
 
-from packet import Message, MessageType, StreamSocket
+from packet import MessageType, StreamSocket
 from game_manager import Game, GameManager
 from player import Player
 
 if TYPE_CHECKING:
     from asyncio import StreamReader, StreamWriter
-
     from packet import Message
 
 
@@ -18,7 +17,6 @@ logger = logging.getLogger(__name__)
 
 
 class GameServer:
-
     def __init__(self):
         self.game_manager = GameManager()
 
@@ -26,7 +24,7 @@ class GameServer:
         server = await asyncio.start_server(self.handle_connection, host, port)
 
         # TODO: this information should be obtained from the server object. Right?
-        logger.debug(f"Running server on {host}:{port}")
+        logger.debug("Running server on %s:%s", host, port)
         async with server:
             await server.serve_forever()
 
@@ -37,7 +35,7 @@ class GameServer:
         # think that is not done.
 
         player = Player(StreamSocket(reader, writer))
-        logger.info(f"Player connected from '{player.socket.peername}'")
+        logger.info("Player connected from '%s'", player.socket.peername)
 
         # TODO: socket.recv_msg() may fail
         # TODO: the base class of all connection related issues is ConnectionError
@@ -47,12 +45,19 @@ class GameServer:
                 if msg.is_game_message():
                     await game.forward_msg(msg, player)
                     if game.has_finished():
-                        # TODO: save the state in the database or do whatever is needed after a game has finished
+                        # TODO: save the state in the database or do whatever
+                        # is needed after a game has finished
                         pass
                 else:
-                    await player.socket.send_msg(Message(MessageType.ERROR, {
-                        "msg": f"You cannot send a message '{msg.msg_type.value}' while you are playing"
-                    }))
+                    await player.socket.send_msg(
+                        Message(
+                            MessageType.ERROR,
+                            {
+                                "msg": f"You cannot send a message "
+                                f"'{msg.msg_type.value}' while you are playing"
+                            },
+                        )
+                    )
             else:
                 await self.handle_msg(player, msg)
 
@@ -63,28 +68,34 @@ class GameServer:
             case MessageType.CREATE_GAME:
                 # TODO: check that the player is not already waiting to join a game
                 game_code = self.game_manager.add_to_waitlist(player)
-                await player.socket.send_msg(Message(MessageType.OK, {
-                    "game_code": game_code
-                }))
+                await player.socket.send_msg(
+                    Message(MessageType.OK, {"game_code": game_code})
+                )
                 logger.info(
-                    f"The player '{player.socket.peername}' has created the game '{game_code}'")
+                    "The player '%s' has created the game '%s'", player.socket.peername, game_code
+                )
 
             case MessageType.JOIN_GAME:
                 game_code = msg.payload["game_code"]
-                opponent_player = self.game_manager.get_waiting_player(
-                    game_code)
+                opponent_player = self.game_manager.get_waiting_player(game_code)
 
                 # Check that the code received makes sense
                 if opponent_player is None:
                     await player.socket.send_msg(
-                        Message(MessageType.ERROR, {
-                                "msg": "No game found for the code '{game_code}'"})
+                        Message(
+                            MessageType.ERROR,
+                            {"msg": "No game found for the code '{game_code}'"},
+                        )
                     )
                     return
-                elif opponent_player is player:
+                if opponent_player is player:
                     await player.socket.send_msg(
-                        Message(MessageType.ERROR, {
-                                "msg": "You cannot join a game if you are also waiting for it"})
+                        Message(
+                            MessageType.ERROR,
+                            {
+                                "msg": "You cannot join a game if you are also waiting for it"
+                            },
+                        )
                     )
                     return
 
@@ -95,11 +106,13 @@ class GameServer:
                 self.game_manager.invalidate_code(game_code)
 
                 logger.info(
-                    f"'{player.socket.peername}' and '{opponent_player.socket.peername}' have started playing")
+                    "'%s' and '%s' have started playing",
+                    player.socket.peername, opponent_player.socket.peername
+                )
 
     async def on_disconnect(self, player: Player):
         # TODO: do whatever is needed to leave the server in a consistent state:
         #  - When a player which waiting disconnects
         #  - When a player which is playing disconnects
-        logger.debug(f"Player '{player.socket.peername}' has disconnected")
+        logger.debug("Player '%s' has disconnected", player.socket.peername)
         await player.socket.close()
