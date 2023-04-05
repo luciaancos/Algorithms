@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+import os
 import copy
 import math
+import concurrent.futures
+from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass, field
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Optional
+
 from game import GameMode, Turn
 from state import State
 
@@ -162,6 +166,7 @@ class MinimaxAgent(BaseAgent):
         best_value = float("-inf")
         best_state = None
         current_turn = game.turn
+
         for successor in State(game).successors():
             value = self._min_value(
                 successor.game,
@@ -245,7 +250,9 @@ class MontecarloNode:
         return self.state.game.mode == GameMode.FINISHED
 
 
+
 class MonteCarloTree:
+
     def __init__(self, game: MillGame) -> None:
         state = State(game)
         self.root = MontecarloNode(state)
@@ -264,16 +271,35 @@ class MonteCarloTree:
 
         return max(self.root.expanded_children, key=MontecarloNode.avg_reward)
 
-    def run_iteration(self, cp):
+    def run_iteration(self, cp: float, executor: Optional[ProcessPoolExecutor]=None):
         """Run the sequence of steps required by the Montecarlo search
         algorithm to add a node to the tree.
 
-        cp is the constant given to formula which selects the best child of a montecarlo node
+        cp is the constant given to the formula which selects the best child of a montecarlo node.
+
+        if 'executor' is not None, it will be used to perform several simulations on the node
+        selected by tree_policy. The number of simulations will correspond to the number returned
+        by os.cpu_count(). In case the number of CPUs cannot be determined, the executor is not
+        used for the simulation. 
+        Therefore, to improve performance, the number of processes in pool (max_workers) must 
+        be set to that number. if 'executor', only one simulation will be performed on the selected node.
         """
 
         selected_node = self.tree_policy(cp)
-        reward = self.default_policy(selected_node)
-        self.backup(selected_node, reward)
+        selected_game = selected_node.state.game
+
+        workers = os.cpu_count() or 1
+
+        if executor is not None and workers > 1:
+            futures = [executor.submit(self.default_policy, selected_game, self.current_turn) for _ in range(workers)]
+            reward = sum([future.result() for future in futures])
+            visited = workers
+        else:
+            reward = self.default_policy(selected_game, self.current_turn)
+            visited = 1
+
+        self.backup(selected_node, reward, visited)
+
 
     def tree_policy(self, cp: float) -> MontecarloNode:
         """Selects the node which is going to be expanded."""
@@ -285,24 +311,30 @@ class MonteCarloTree:
 
         return current_node
 
-    def default_policy(self, node: MontecarloNode):
-        """Randomly simulate a game and return a reward based on the result."""
-        game = copy.deepcopy(node.state.game)
+
+    @staticmethod
+    def default_policy(game: MillGame, current_turn: Turn):
+        """Randomly simulate a game and return a reward based on the result.
+        This method is static so that pickle does not try to serialize MonteCarloTree """
+        game = copy.deepcopy(game)
         random_agent = RandomAgent()
+
         while game.mode != GameMode.FINISHED:
             random_agent.perform_move(game)
 
         if game.winner is None:
             return 0
-        if game.winner == self.current_turn:
+        if game.winner == current_turn:
             return 1
         return -1
 
-    def backup(self, node: MontecarloNode, reward: int):
-        """Propagate the reward obtained for node until the root is reached."""
+    def backup(self, node: MontecarloNode, reward: int, visited: int):
+        """Propagate the reward obtained for node until the root is reached.
+        'visited' is the number of times the node has been visited. """
+
         while node is not None:
-            node.visits += 1
-            node.accumulated_rewards += 1
+            node.visits += visited
+            node.accumulated_rewards += reward
             reward = -reward
             node = node.parent  # type: ignore
 
@@ -311,27 +343,43 @@ class MCTSAgent(BaseAgent):
     """This algorithm chooses a move according to the Monte Carlo Tree Search
     algorithm."""
 
-    def __init__(self, iterations: int, cp: Optional[int] = None):
+    def __init__(self, iterations: int, cp: Optional[int] = None, parallel: bool=True):
         """iterations are the number of iterations the algorithm is going to
         run.
 
         cp is a constant which influences the value given to a state when deciding
         which one to choose. If None is given, a recommended one is used. See MontecarloNode.uct_value()
-
         See MonteCarloTree.run_iteration() for more information
+
+        if parallel is true, several simulations will be made for a selected node
         """
 
         self.montecarlo_tree = None
         self.iterations = iterations
         self.cp = 1 / 2 ** 0.5 if cp is None else cp
+        self._executor = ProcessPoolExecutor() if parallel else None
 
     def _next_state(self, game: MillGame) -> Optional[State]:
         """Returns the next state of the game chosen by this algorithm."""
         self.montecarlo_tree = MonteCarloTree(game)
         for _ in range(self.iterations):
-            self.montecarlo_tree.run_iteration(self.cp)
+            self.montecarlo_tree.run_iteration(self.cp, self._executor)
+
 
         return self.montecarlo_tree.best_node().state
+
+    def release(self):
+        """ Release the resources aquired by the agent. If parallel is True, it will release
+        the resources aquired by the executor. Otherwise, it won't do anything. The same is done
+        when the context manager protocol is used."""
+        if self._executor is not None:
+            self._executor.shutdown()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_value, exc_tb):
+        self.release()
 
 
 class HybridAgent(BaseAgent):
