@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 
 
 # TODO: think on a better way to organize this using modules and packages
-class MoveAlgorithm(ABC):
+class BaseAgent(ABC):
     """ Base class for the algorithms which perform a specific move on a MillGame """
 
     def perform_move(self, game: MillGame) -> Optional[Move]:
@@ -53,7 +53,7 @@ class MoveAlgorithm(ABC):
         by every subclass of MoveAlgorithm """
 
 
-class RandomMove(MoveAlgorithm):
+class RandomAgent(BaseAgent):
     """ This algorithm chooses a move uniformly at random from the set of available ones """
 
     def _next_state(self, game: MillGame) -> Optional[State]:
@@ -65,7 +65,7 @@ class RandomMove(MoveAlgorithm):
         # A StopIterationError won't be thrown because that only happens when the game state
         return next(State(game).successors(shuffle=True))
 
-class MinimaxMove(MoveAlgorithm):
+class MinimaxAgent(BaseAgent):
     """ This algorithm chooses a move according to the minimax algorithm with alpha-beta pruning """
 
     def __init__(self, max_depth: int):
@@ -193,7 +193,6 @@ class MontecarloNode:
 
 
 class MonteCarloTree:
-
     def __init__(self, game: MillGame) -> None:
         state = State(game)
         self.root = MontecarloNode(state)
@@ -255,8 +254,8 @@ class MonteCarloTree:
             node = node.parent  # type: ignore
 
 
-class MonteCarloMove(MoveAlgorithm):
-    """ This algorithm chooses a move according to the monte carlo tree search algorithm """
+class MCTSAgent(BaseAgent):
+    """ This algorithm chooses a move according to the Monte Carlo Tree Search algorithm """
 
     def __init__(self, iterations: int):
         """ iterations are the number of iterations the algorithm is going to run. See
@@ -274,12 +273,12 @@ class MonteCarloMove(MoveAlgorithm):
 
         return self.montecarlo_tree.best_node().state
 
-class HybridMove(MoveAlgorithm):
+class HybridAgent(BaseAgent):
     """ This algorithm chooses a move according to the monte carlo tree search algorithm during n turns, and after that chooses it according to minimax algorithm """
 
     def __init__(self, n_iterations: int, max_depth: int, mcts_limit: int):
-        self.mcts_agent = MonteCarloMove(n_iterations)
-        self.minimax_agent = MinimaxMove(max_depth)
+        self.mcts_agent = MCTSAgent(n_iterations)
+        self.minimax_agent = MinimaxAgent(max_depth)
         self.mcts_limit = mcts_limit
         self.turn_counter = 0
         
