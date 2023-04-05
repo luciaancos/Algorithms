@@ -12,7 +12,6 @@ if TYPE_CHECKING:
     from game import Move, MillGame
 
 
-# TODO: think on a better way to organize this using modules and packages
 class BaseAgent(ABC):
     """Base class for the algorithms which perform a specific move on a
     MillGame."""
@@ -108,7 +107,12 @@ class MinimaxAgent(BaseAgent):
         )
 
     def _max_value(
-        self, game: MillGame, current_turn: Turn, alpha: int, beta: int, depth: int
+        self,
+        game: MillGame,
+        current_turn: Turn,
+        alpha: int,
+        beta: int,
+        depth: int
     ) -> int:
         """Computes the value of a state for the player that is maximizing."""
         if depth == 0 or game.mode == GameMode.FINISHED:
@@ -127,7 +131,12 @@ class MinimaxAgent(BaseAgent):
         return value
 
     def _min_value(
-        self, game: MillGame, current_turn: Turn, alpha: int, beta: int, depth: int
+        self, 
+        game: MillGame,
+        current_turn: Turn,
+        alpha: int,
+        beta: int,
+        depth: int
     ) -> int:
         """Computes the value of a state for the player that is minimizing."""
         if depth == 0 or game.mode == GameMode.FINISHED:
@@ -202,8 +211,11 @@ class MontecarloNode:
 
         return self.accumulated_rewards / self.visits
 
-    def uct_value(self) -> float:
+    def uct_value(self, cp: float) -> float:
         """Returns the uct value for the this node.
+
+        cp is a constant, which the user is free to choose, that is part of the formula
+        which ranks an unexplored child based on how appropiate it is to explore it.
 
         If this node is the root, an exception is raised
         """
@@ -211,16 +223,17 @@ class MontecarloNode:
         if self.parent is None:
             raise ValueError("You can not get the evaluation of the root")
 
-        # TODO: this constant should be given as a parameter
-        cp = 1 / 2**0.5
         bound = 2 * cp * (2 * math.log(self.parent.visits) / self.visits) ** 0.5
         return self.avg_reward() + bound
 
-    def get_best_child(self) -> MontecarloNode:
-        """Returns the child node with the highest uct value."""
-        return max(
-            list(self.expanded_children), key=MontecarloNode.uct_value
-        )
+    def get_best_child(self, cp: float) -> MontecarloNode:
+        """Returns the child node with the highest uct value.
+
+        cp is a constant, which the user is free to choose, that is part of the formula
+        which ranks an unexplored child based on how appropiate it is to explore it.
+
+        """
+        return max(self.expanded_children, key=lambda child: child.uct_value(cp))
 
     def is_terminal(self) -> bool:
         """Returns true if this is a terminal state.
@@ -249,26 +262,26 @@ class MonteCarloTree:
         if len(self.root.expanded_children) == 0:
             raise ValueError("The root does not have any children")
 
-        return max(
-            list(self.root.expanded_children),
-            key=MontecarloNode.avg_reward,
-        )
+        return max(self.root.expanded_children, key=MontecarloNode.avg_reward)
 
-    def run_iteration(self):
+    def run_iteration(self, cp):
         """Run the sequence of steps required by the Montecarlo search
-        algorithm to add a node to the tree."""
+        algorithm to add a node to the tree.
 
-        selected_node = self.tree_policy()
+        cp is the constant given to formula which selects the best child of a montecarlo node
+        """
+
+        selected_node = self.tree_policy(cp)
         reward = self.default_policy(selected_node)
         self.backup(selected_node, reward)
 
-    def tree_policy(self) -> MontecarloNode:
+    def tree_policy(self, cp: float) -> MontecarloNode:
         """Selects the node which is going to be expanded."""
         current_node = self.root
         while not current_node.is_terminal():
             if (next_child := current_node.next_child()) is not None:
                 return next_child
-            current_node = current_node.get_best_child()
+            current_node = current_node.get_best_child(cp)
 
         return current_node
 
@@ -298,20 +311,25 @@ class MCTSAgent(BaseAgent):
     """This algorithm chooses a move according to the Monte Carlo Tree Search
     algorithm."""
 
-    def __init__(self, iterations: int):
+    def __init__(self, iterations: int, cp: Optional[int] = None):
         """iterations are the number of iterations the algorithm is going to
         run.
 
+        cp is a constant which influences the value given to a state when deciding
+        which one to choose. If None is given, a recommended one is used. See MontecarloNode.uct_value()
+
         See MonteCarloTree.run_iteration() for more information
         """
+
         self.montecarlo_tree = None
         self.iterations = iterations
+        self.cp = 1 / 2 ** 0.5 if cp is None else cp
 
     def _next_state(self, game: MillGame) -> Optional[State]:
         """Returns the next state of the game chosen by this algorithm."""
         self.montecarlo_tree = MonteCarloTree(game)
         for _ in range(self.iterations):
-            self.montecarlo_tree.run_iteration()
+            self.montecarlo_tree.run_iteration(self.cp)
 
         return self.montecarlo_tree.best_node().state
 
