@@ -323,11 +323,13 @@ class MonteCarloTree:
         # If we are going to simulate it just once, it is cheaper to do it here instead of on another
         # process because of IPC overhead
         if executor is not None and executor.runs > 1:
+            # A copy is not needed here because all the data needed to run a simulation is cloned so that
+            # the process can use it and that includes the MillGame 
             rewards = executor.run_simulation(self.default_policy, selected_game, self.current_turn)
             reward = sum(rewards)
             visited = executor.runs
         else:
-            reward = self.default_policy(selected_game, self.current_turn)
+            reward = self.default_policy(copy.deepcopy(selected_game), self.current_turn)
             visited = 1
 
         self.backup(selected_node, reward, visited)
@@ -348,15 +350,14 @@ class MonteCarloTree:
     def default_policy(game: MillGame, current_turn: Turn):
         """Randomly simulate a game and return a reward based on the result.
         This method is static so that pickle does not try to serialize MonteCarloTree """
-        game_copy = copy.deepcopy(game)
         random_agent = RandomAgent()
 
-        while game_copy.mode != GameMode.FINISHED:
-            random_agent.perform_move(game_copy)
+        while game.mode != GameMode.FINISHED:
+            random_agent.perform_move(game)
 
-        if game_copy.winner is None:
+        if game.winner is None:
             return 0.5
-        if game_copy.winner == current_turn:
+        if game.winner == current_turn:
             return 1
         return 0
 
