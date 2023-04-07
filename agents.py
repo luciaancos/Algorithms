@@ -197,13 +197,13 @@ class MontecarloNode:
 
         If this node is fully expanded, return None
         """
-        try:
-            new_state = next(self._sucessors)
-            child = MontecarloNode(new_state, self)
-            self.expanded_children.append(child)
-            return child
-        except StopIteration:
+        new_state = next(self._sucessors, None)
+        if new_state is None:
             return None
+
+        child = MontecarloNode(new_state, self)
+        self.expanded_children.append(child)
+        return child
 
     def avg_reward(self) -> float:
         """Returns the average reward for this node."""
