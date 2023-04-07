@@ -3,11 +3,10 @@ from __future__ import annotations
 import os
 import copy
 import math
-import concurrent.futures
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass, field
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Callable, Optional
 
 from game import GameMode, Turn
 from state import State
@@ -73,7 +72,7 @@ class RandomAgent(BaseAgent):
         if game.mode == GameMode.FINISHED:
             return None
 
-        # A StopIterationError won't be thrown because that only happens when the game state
+        # A StopIterationError won't be thrown because that only happens when the game state is finished
         return next(State(game).successors(shuffle=True))
 
 
@@ -187,7 +186,7 @@ class MontecarloNode:
     state: State
     parent: Optional[MontecarloNode] = None
     visits: int = 0
-    accumulated_rewards: int = 0
+    accumulated_rewards: float = 0
     expanded_children: list[MontecarloNode] = field(default_factory=list, init=False)
 
     def __post_init__(self):
@@ -250,6 +249,39 @@ class MontecarloNode:
         return self.state.game.mode == GameMode.FINISHED
 
 
+class _SimulationExecutor:
+    """ Wrapper for the ProcessPoolExecutor which will perform several simulations on a given MillGame """
+
+    def __init__(self, runs: int):
+        self.runs = runs
+
+        # The processes are created lazily. This means that although the maximum number
+        # of processes spawned is os.cpu_count(), they will created if needed
+        self._executor = ProcessPoolExecutor()
+
+    def run_simulation(self,
+            simulation: Callable[[MillGame, Turn], float],
+            game: MillGame,
+            turn: Turn) -> list[float]:
+        """ Run 'runs' simulations in parallel """
+
+        futures = [self._executor.submit(simulation, game, turn) for _ in range(self._runs)]
+        rewards = [future.result() for future in futures]
+        return rewards
+
+    def shutdown(self):
+        self._executor.shutdown()
+
+    @property
+    def runs(self) -> int:
+        return self._runs
+
+    @runs.setter
+    def runs(self, runs):
+        if runs <= 0:
+            raise ValueError("'runs' cannot be negative or 0")
+        self._runs = runs
+
 
 class MonteCarloTree:
 
@@ -271,7 +303,7 @@ class MonteCarloTree:
 
         return max(self.root.expanded_children, key=MontecarloNode.avg_reward)
 
-    def run_iteration(self, cp: float, executor: Optional[ProcessPoolExecutor]=None):
+    def run_iteration(self, cp: float, executor: Optional[_SimulationExecutor]=None):
         """Run the sequence of steps required by the Montecarlo search
         algorithm to add a node to the tree.
 
@@ -288,12 +320,12 @@ class MonteCarloTree:
         selected_node = self.tree_policy(cp)
         selected_game = selected_node.state.game
 
-        workers = os.cpu_count() or 1
-
-        if executor is not None and workers > 1:
-            futures = [executor.submit(self.default_policy, selected_game, self.current_turn) for _ in range(workers)]
-            reward = sum([future.result() for future in futures])
-            visited = workers
+        # If we are going to simulate it just once, it is cheaper to do it here instead of on another
+        # process because of IPC overhead
+        if executor is not None and executor.runs > 1:
+            rewards = executor.run_simulation(self.default_policy, selected_game, self.current_turn)
+            reward = sum(rewards)
+            visited = executor.runs
         else:
             reward = self.default_policy(selected_game, self.current_turn)
             visited = 1
@@ -316,26 +348,25 @@ class MonteCarloTree:
     def default_policy(game: MillGame, current_turn: Turn):
         """Randomly simulate a game and return a reward based on the result.
         This method is static so that pickle does not try to serialize MonteCarloTree """
-        game = copy.deepcopy(game)
+        game_copy = copy.deepcopy(game)
         random_agent = RandomAgent()
 
-        while game.mode != GameMode.FINISHED:
-            random_agent.perform_move(game)
+        while game_copy.mode != GameMode.FINISHED:
+            random_agent.perform_move(game_copy)
 
-        if game.winner is None:
-            return 0
-        if game.winner == current_turn:
+        if game_copy.winner is None:
+            return 0.5
+        if game_copy.winner == current_turn:
             return 1
-        return -1
+        return 0
 
-    def backup(self, node: MontecarloNode, reward: int, visited: int):
+    def backup(self, node: MontecarloNode, reward: float, visited: int):
         """Propagate the reward obtained for node until the root is reached.
         'visited' is the number of times the node has been visited. """
 
         while node is not None:
             node.visits += visited
             node.accumulated_rewards += reward
-            reward = -reward
             node = node.parent  # type: ignore
 
 
@@ -343,7 +374,7 @@ class MCTSAgent(BaseAgent):
     """This algorithm chooses a move according to the Monte Carlo Tree Search
     algorithm."""
 
-    def __init__(self, iterations: int, cp: Optional[int] = None, parallel: bool=True):
+    def __init__(self, iterations: int, runs: int=1, cp: Optional[int]=None):
         """iterations are the number of iterations the algorithm is going to
         run.
 
@@ -351,20 +382,24 @@ class MCTSAgent(BaseAgent):
         which one to choose. If None is given, a recommended one is used. See MontecarloNode.uct_value()
         See MonteCarloTree.run_iteration() for more information
 
-        if parallel is true, several simulations will be made for a selected node
+        'runs' is the number of simulations that will be made on a chosen node. If this number is greater than 1,
+        then the simulations will be run in parallel in a maximum of os.cpu_count() proceses. The optimal value
+        depends on a lot of factors but the recommendations is to set that number to os.cpu_count(). If 'runs' equals
+        1, no additional process will be created.
         """
 
         self.montecarlo_tree = None
         self.iterations = iterations
         self.cp = 1 / 2 ** 0.5 if cp is None else cp
-        self._executor = ProcessPoolExecutor() if parallel else None
+
+        self._executor = None
+        self.runs = runs
 
     def _next_state(self, game: MillGame) -> Optional[State]:
         """Returns the next state of the game chosen by this algorithm."""
         self.montecarlo_tree = MonteCarloTree(game)
         for _ in range(self.iterations):
             self.montecarlo_tree.run_iteration(self.cp, self._executor)
-
 
         return self.montecarlo_tree.best_node().state
 
@@ -374,6 +409,22 @@ class MCTSAgent(BaseAgent):
         when the context manager protocol is used."""
         if self._executor is not None:
             self._executor.shutdown()
+
+    @property
+    def runs(self) -> int:
+        return self._runs
+
+    @runs.setter
+    def runs(self, runs: int):
+        if self._executor is None:
+            if runs > 1:
+                self._executor = _SimulationExecutor(runs)
+            elif runs <= 0:
+                raise ValueError("'runs' cannot be 0 or negative")
+        else:
+            self._executor.runs = runs
+
+        self._runs = runs
 
     def __enter__(self):
         return self

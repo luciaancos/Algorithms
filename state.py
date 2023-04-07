@@ -100,13 +100,12 @@ class State:
         # be reached using the same kind of move if it exists. This will
         # continue until all the kill moves have been consumed
 
+        if shuffle:
+            self._shuffle_indices()
+
         if self.game.mode == GameMode.PLACE:
-            if shuffle:
-                self._shuffle_indices()
             yield from self._generate_place_sucessors()
         elif self.game.mode == GameMode.MOVE:
-            if shuffle:
-                self._shuffle_indices()
             yield from self._generate_move_sucessors()
 
     def _shuffle_indices(self):
