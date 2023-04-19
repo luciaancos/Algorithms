@@ -1,4 +1,5 @@
 from __future__ import annotations
+import json
 
 import os
 import copy
@@ -6,6 +7,7 @@ import math
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass, field
 from abc import ABC, abstractmethod
+import pickle
 from typing import TYPE_CHECKING, Callable, Optional
 
 from game import GameMode, Turn
@@ -455,3 +457,100 @@ class HybridAgent(BaseAgent):
             self.turn_counter += 1
             return self.mcts_agent._next_state(game)
         return self.minimax_agent._next_state(game)
+
+class QlearningAgent(BaseAgent):
+    def __init__(self, num_episodes: int = 5, learning_factor: float=0.1, discount_factor: float=0.9):
+        self.num_episodes = num_episodes
+        self.learning_factor = learning_factor
+        self.discount_factor = discount_factor
+        self.q_table = {}
+
+    def calculate_reward(self, initial_turn:Turn, next_state:State) -> int: 
+        if next_state.game.mode == GameMode.FINISHED:
+            if next_state.game.winner == initial_turn:
+                return 100
+            else:
+                return -100
+        else:
+            return -1
+
+
+    def max_qvalue(self, state:State) -> float: #Obtener el máximo valor de Q para este siguiente estado basado en todas las posibles acciones.
+        best = None
+
+        for state_action, value in self.q_table.items():
+            if state_action[0] == state:
+                if best == None or value > best: 
+                    best = value
+        
+        if best == None:
+            best = 0
+        
+        return best
+
+
+    def train(self, game: MillGame) -> Optional[State]:
+
+        # try:
+        #     with open("q_table.json", "r") as archivo_json:
+        #         self.q_table = json.load(archivo_json)
+        # except FileNotFoundError:
+        #     self.q_table = {}
+        #abrir el archivo "q_table.json" en modo de escritura
+        #with open("q_table.json", "a") as archivo_json:
+        #with open("data.pickle", "wb") as f:
+            for episode in range(self.num_episodes):
+                state = next(State(game).successors(shuffle=True)) ## solo lo va a coger de los primeros sucesores
+                initial_turn = state.game.turn
+                while state.game.mode != GameMode.FINISHED:
+                
+                    
+                    next_state = next(state.successors(shuffle=True)) ##elige un accion aleatoria
+                
+                    
+
+                    self.q_table[(state.__str__(), next_state.move.__str__())] = 0
+                    value = self.q_table[(state.__str__(), next_state.move.__str__())] + self.learning_factor * (self.calculate_reward(initial_turn, next_state) + self.discount_factor * self.max_qvalue(next_state) - self.q_table[(state.__str__(), next_state.move.__str__())]) 
+                    
+                    #guardar el value en el dic y pasar esa fila a json
+                    self.q_table[(state.__str__(), next_state.move.__str__())] = value
+                    
+    
+
+                    # fila_temporal = {'KEY:': (state.__str__(), next_state.move.__str__()), 'VALUE:': value}
+                    
+                    #  # escribir el diccionario temporal en formato JSON en el archivo
+                    # json.dump(fila_temporal, archivo_json)
+                    # archivo_json.write("\n")
+                    
+                    state = next_state
+                    
+                print("TERMINA 1 EPISODIO")
+            print(self.q_table)
+        # if not self.q_table:
+        #     print("El diccionario q_table está vacío")
+        # else:
+        #     print("el dicc no esta vacio")
+            #json.dump(self.q_table, archivo_json)
+            with open("data.pickle", "wb") as f:
+                pickle.dump(self.q_table, f)
+
+    def _next_state(self, game: MillGame) -> Optional[State]:
+        state = State(game)
+        best = None
+        sum_prob = 0
+        max_action = None
+        prob = 0
+
+
+        for state_action, value in self.q_table.items():
+            if state_action[0] == state:
+                sum_prob += value
+        
+        for state_action, value in self.q_table.items():
+            if state_action[0] == state:
+                if prob<(value/sum_prob):
+                    prob = value
+                    max_action = state_action[0] #es max_ation pero quiero que devuelva el estado
+            
+        return max_action
