@@ -461,7 +461,7 @@ class HybridAgent(BaseAgent):
         return self.minimax_agent._next_state(game)
 
 class QlearningAgent(BaseAgent):
-    def __init__(self, num_episodes: int = 1, learning_factor: float=0.1, discount_factor: float=0.9):
+    def __init__(self, num_episodes: int = 10, learning_factor: float=0.1, discount_factor: float=0.9):
         self.num_episodes = num_episodes
         self.learning_factor = learning_factor
         self.discount_factor = discount_factor
@@ -480,16 +480,6 @@ class QlearningAgent(BaseAgent):
     def max_qvalue(self, state:State) -> float: #Obtener el máximo valor de Q para este siguiente estado basado en todas las posibles acciones.
         best = None
 
-        # for state_action, value in self.q_table.items():
-        #     if state_action[0] == state:
-        #         if best == None or value > best: 
-        #             best = value
-        
-        # if best == None:
-        #     best = 0
-        
-        # return best
-
         for key, value in self.q_table.items():
             for sucessor in state.successors():
                 check_tuple = str(state) + str(sucessor.move)
@@ -504,64 +494,35 @@ class QlearningAgent(BaseAgent):
 
 
     def train(self, game: MillGame) -> Optional[State]:
-
-        # try:
-        #     with open("q_table.json", "r") as archivo_json:
-        #         self.q_table = json.load(archivo_json)
-        # except FileNotFoundError:
-        #     self.q_table = {}
-        #abrir el archivo "q_table.json" en modo de escritura
-        #with open("q_table.json", "a") as archivo_json:
-        #with open("data.pickle", "wb") as f:
         try:
             with open('q_table.json', 'r') as f:
                 self.q_table = json.load(f)
         except FileNotFoundError:
             self.q_table = {}
         for episode in range(self.num_episodes):
-            state = next(State(game).successors(shuffle=True)) ## solo lo va a coger de los primeros sucesores
+            state = next(State(game).successors(shuffle=True)) 
             initial_turn = state.game.turn
             while state.game.mode != GameMode.FINISHED:
                 curiosity_factor = random.random()
                 print(curiosity_factor)
                 if curiosity_factor < 0.2:
                     print("hace random")
-                    next_state = next(state.successors(shuffle=True)) ##elige un accion aleatoria
+                    next_state = next(state.successors(shuffle=True)) 
                 else:
                     print("hace montecarlo")
                     mc_player = MCTSAgent(iterations=50)
                     next_state = mc_player._next_state(state.game)
                 
                 key = str(state) + str(next_state.move)
-
                 hash_key = hashlib.md5(key.encode()).hexdigest()
 
-                print(hash_key)
                 self.q_table[hash_key] = 0
                 value = self.q_table[hash_key] + self.learning_factor * (self.calculate_reward(initial_turn, next_state) + self.discount_factor * self.max_qvalue(next_state) - self.q_table[hash_key]) 
-            
-            #guardar el value en el dic y pasar esa fila a json
                 self.q_table[hash_key] = value
-                
-
-
-                # fila_temporal = {'KEY:': (state.__str__(), next_state.move.__str__()), 'VALUE:': value}
-                
-                #  # escribir el diccionario temporal en formato JSON en el archivo
-                # json.dump(fila_temporal, archivo_json)
-                # archivo_json.write("\n")
                 
                 state = next_state
                 
             print("TERMINA 1 EPISODIO")
-        print(self.q_table)
-    # if not self.q_table:
-    #     print("El diccionario q_table está vacío")
-    # else:
-    #     print("el dicc no esta vacio")
-        #json.dump(self.q_table, archivo_json)
-        # with open("data.pickle", "wb") as f:
-        #     pickle.dump(self.q_table, f)
         with open("q_table.json", "w") as json_file:
             json.dump(self.q_table, json_file, indent=1)
 
@@ -569,18 +530,38 @@ class QlearningAgent(BaseAgent):
         state = State(game)
         best = None
         sum_prob = 0
-        max_action = None
+        # max_action = None
         prob = 0
 
 
-        for state_action, value in self.q_table.items():
-            if state_action[0] == state:
-                sum_prob += value
+        # for state_action, value in self.q_table.items():
+        #     if state_action[0] == state:
+        #         sum_prob += value
         
-        for state_action, value in self.q_table.items():
-            if state_action[0] == state:
-                if prob<(value/sum_prob):
-                    prob = value
-                    max_action = state_action[0] #es max_ation pero quiero que devuelva el estado
+        # for state_action, value in self.q_table.items():
+        #     if state_action[0] == state:
+        #         if prob<(value/sum_prob):
+        #             prob = value
+        #             max_action = state_action[0] #es max_ation pero quiero que devuelva el estado
+        
+        for key, value in self.q_table.items():
+            for sucessor in state.successors():
+                check_tuple = str(state) + str(sucessor.move)
+                hash_check_tuple = hashlib.md5(check_tuple.encode()).hexdigest()
+                if key == hash_check_tuple:
+                    sum_prob += value
+
+        for key, value in self.q_table.items():
+            for sucessor in state.successors():
+                check_tuple = str(state) + str(sucessor.move)
+                hash_check_tuple = hashlib.md5(check_tuple.encode()).hexdigest()
+                if key == hash_check_tuple:
+                    if prob < (value/sum_prob):
+                        prob = value
+                        best = sucessor
+        if best is not None:
+            return best
+        else:
+            return None
             
-        return max_action
+    
