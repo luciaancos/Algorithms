@@ -1,4 +1,5 @@
 from __future__ import annotations
+import hashlib
 import json
 
 import os
@@ -8,6 +9,7 @@ from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass, field
 from abc import ABC, abstractmethod
 import pickle
+import random
 from typing import TYPE_CHECKING, Callable, Optional
 
 from game import GameMode, Turn
@@ -459,7 +461,7 @@ class HybridAgent(BaseAgent):
         return self.minimax_agent._next_state(game)
 
 class QlearningAgent(BaseAgent):
-    def __init__(self, num_episodes: int = 5, learning_factor: float=0.1, discount_factor: float=0.9):
+    def __init__(self, num_episodes: int = 1, learning_factor: float=0.1, discount_factor: float=0.9):
         self.num_episodes = num_episodes
         self.learning_factor = learning_factor
         self.discount_factor = discount_factor
@@ -478,14 +480,26 @@ class QlearningAgent(BaseAgent):
     def max_qvalue(self, state:State) -> float: #Obtener el máximo valor de Q para este siguiente estado basado en todas las posibles acciones.
         best = None
 
-        for state_action, value in self.q_table.items():
-            if state_action[0] == state:
-                if best == None or value > best: 
-                    best = value
+        # for state_action, value in self.q_table.items():
+        #     if state_action[0] == state:
+        #         if best == None or value > best: 
+        #             best = value
         
+        # if best == None:
+        #     best = 0
+        
+        # return best
+
+        for key, value in self.q_table.items():
+            for sucessor in state.successors():
+                check_tuple = str(state) + str(sucessor.move)
+                hash_check_tuple = hashlib.md5(check_tuple.encode()).hexdigest()
+                if key == hash_check_tuple:
+                    if best == None or value > best:
+                        best = value
         if best == None:
             best = 0
-        
+
         return best
 
 
@@ -499,41 +513,57 @@ class QlearningAgent(BaseAgent):
         #abrir el archivo "q_table.json" en modo de escritura
         #with open("q_table.json", "a") as archivo_json:
         #with open("data.pickle", "wb") as f:
-            for episode in range(self.num_episodes):
-                state = next(State(game).successors(shuffle=True)) ## solo lo va a coger de los primeros sucesores
-                initial_turn = state.game.turn
-                while state.game.mode != GameMode.FINISHED:
-                
-                    
+        try:
+            with open('q_table.json', 'r') as f:
+                self.q_table = json.load(f)
+        except FileNotFoundError:
+            self.q_table = {}
+        for episode in range(self.num_episodes):
+            state = next(State(game).successors(shuffle=True)) ## solo lo va a coger de los primeros sucesores
+            initial_turn = state.game.turn
+            while state.game.mode != GameMode.FINISHED:
+                curiosity_factor = random.random()
+                print(curiosity_factor)
+                if curiosity_factor < 0.2:
+                    print("hace random")
                     next_state = next(state.successors(shuffle=True)) ##elige un accion aleatoria
+                else:
+                    print("hace montecarlo")
+                    mc_player = MCTSAgent(iterations=50)
+                    next_state = mc_player._next_state(state.game)
                 
-                    
+                key = str(state) + str(next_state.move)
 
-                    self.q_table[(state.__str__(), next_state.move.__str__())] = 0
-                    value = self.q_table[(state.__str__(), next_state.move.__str__())] + self.learning_factor * (self.calculate_reward(initial_turn, next_state) + self.discount_factor * self.max_qvalue(next_state) - self.q_table[(state.__str__(), next_state.move.__str__())]) 
-                    
-                    #guardar el value en el dic y pasar esa fila a json
-                    self.q_table[(state.__str__(), next_state.move.__str__())] = value
-                    
-    
+                hash_key = hashlib.md5(key.encode()).hexdigest()
 
-                    # fila_temporal = {'KEY:': (state.__str__(), next_state.move.__str__()), 'VALUE:': value}
-                    
-                    #  # escribir el diccionario temporal en formato JSON en el archivo
-                    # json.dump(fila_temporal, archivo_json)
-                    # archivo_json.write("\n")
-                    
-                    state = next_state
-                    
-                print("TERMINA 1 EPISODIO")
-            print(self.q_table)
-        # if not self.q_table:
-        #     print("El diccionario q_table está vacío")
-        # else:
-        #     print("el dicc no esta vacio")
-            #json.dump(self.q_table, archivo_json)
-            with open("data.pickle", "wb") as f:
-                pickle.dump(self.q_table, f)
+                print(hash_key)
+                self.q_table[hash_key] = 0
+                value = self.q_table[hash_key] + self.learning_factor * (self.calculate_reward(initial_turn, next_state) + self.discount_factor * self.max_qvalue(next_state) - self.q_table[hash_key]) 
+            
+            #guardar el value en el dic y pasar esa fila a json
+                self.q_table[hash_key] = value
+                
+
+
+                # fila_temporal = {'KEY:': (state.__str__(), next_state.move.__str__()), 'VALUE:': value}
+                
+                #  # escribir el diccionario temporal en formato JSON en el archivo
+                # json.dump(fila_temporal, archivo_json)
+                # archivo_json.write("\n")
+                
+                state = next_state
+                
+            print("TERMINA 1 EPISODIO")
+        print(self.q_table)
+    # if not self.q_table:
+    #     print("El diccionario q_table está vacío")
+    # else:
+    #     print("el dicc no esta vacio")
+        #json.dump(self.q_table, archivo_json)
+        # with open("data.pickle", "wb") as f:
+        #     pickle.dump(self.q_table, f)
+        with open("q_table.json", "w") as json_file:
+            json.dump(self.q_table, json_file, indent=1)
 
     def _next_state(self, game: MillGame) -> Optional[State]:
         state = State(game)
