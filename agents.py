@@ -461,23 +461,40 @@ class HybridAgent(BaseAgent):
         return self.minimax_agent._next_state(game)
 
 class QlearningAgent(BaseAgent):
-    def __init__(self, num_episodes: int = 10, learning_factor: float=0.1, discount_factor: float=0.9):
+    """This algorithm chooses a move according to the values it had learned 
+    by applying q-learning through a dynamic programming algorithm"""
+
+    def __init__(self, num_episodes: int = 1, learning_factor: float=0.1, discount_factor: float=0.9):
         self.num_episodes = num_episodes
         self.learning_factor = learning_factor
         self.discount_factor = discount_factor
+        self.curiosity_factor = 0.2
         self.q_table = {}
 
     def calculate_reward(self, initial_turn:Turn, next_state:State) -> int: 
+        """Obtain the reward for this state based on whether it is terminal or if 
+        it gets any mills."""
+        reward = 0
+        #Check if the state is terminal
         if next_state.game.mode == GameMode.FINISHED:
             if next_state.game.winner == initial_turn:
-                return 100
+                reward+= 100
             else:
-                return -100
+                reward+= -100
         else:
-            return -1
+            reward+= -1
 
+        #Check if there is a mill
+        if next_state.move.kill is not None: 
+            if next_state.game.turn == initial_turn:
+                reward += 30
+            else:
+                reward += -30
+        
+        return reward                    
 
-    def max_qvalue(self, state:State) -> float: #Obtener el máximo valor de Q para este siguiente estado basado en todas las posibles acciones.
+    def max_qvalue(self, state:State) -> float: 
+        """Obtain the maximum Q value for this state based on all possible actions."""
         best = None
 
         for key, value in self.q_table.items():
@@ -485,64 +502,58 @@ class QlearningAgent(BaseAgent):
                 check_tuple = str(state) + str(sucessor.move)
                 hash_check_tuple = hashlib.md5(check_tuple.encode()).hexdigest()
                 if key == hash_check_tuple:
-                    if best == None or value > best:
+                    if best is None or value > best:
                         best = value
-        if best == None:
+        if best is None:
             best = 0
 
         return best
 
 
     def train(self, game: MillGame) -> Optional[State]:
+        """Loads the content of the json file and stores it in the q_table 
+        dictionary. This dictionary will be updated with new state-action pairs 
+        with their corresponding value of the q-value formula. This represents 
+        the knowledge of our agent """
         try:
-            with open('q_table.json', 'r') as f:
+            with open('prueba.json', 'r') as f:
                 self.q_table = json.load(f)
         except FileNotFoundError:
             self.q_table = {}
-        for episode in range(self.num_episodes):
+
+        for _ in range(self.num_episodes):
             state = next(State(game).successors(shuffle=True)) 
             initial_turn = state.game.turn
             while state.game.mode != GameMode.FINISHED:
-                curiosity_factor = random.random()
-                print(curiosity_factor)
-                if curiosity_factor < 0.2:
-                    print("hace random")
+                prob = random.random()
+                if prob < self.curiosity_factor:
                     next_state = next(state.successors(shuffle=True)) 
                 else:
-                    print("hace montecarlo")
                     mc_player = MCTSAgent(iterations=50)
                     next_state = mc_player._next_state(state.game)
-                
+             
                 key = str(state) + str(next_state.move)
                 hash_key = hashlib.md5(key.encode()).hexdigest()
 
                 self.q_table[hash_key] = 0
-                value = self.q_table[hash_key] + self.learning_factor * (self.calculate_reward(initial_turn, next_state) + self.discount_factor * self.max_qvalue(next_state) - self.q_table[hash_key]) 
+                value = self.q_table[hash_key] + self.learning_factor * \
+                        (self.calculate_reward(initial_turn, next_state) + \
+                        self.discount_factor * self.max_qvalue(next_state) - \
+                        self.q_table[hash_key]) 
                 self.q_table[hash_key] = value
                 
                 state = next_state
                 
-            print("TERMINA 1 EPISODIO")
-        with open("q_table.json", "w") as json_file:
+        with open("prueba.json", "w") as json_file:
             json.dump(self.q_table, json_file, indent=1)
 
     def _next_state(self, game: MillGame) -> Optional[State]:
+        """Returns the next state of the game chosen by this algorithm."""
+        #TODO: cargar q_table
         state = State(game)
         best = None
         sum_prob = 0
-        # max_action = None
         prob = 0
-
-
-        # for state_action, value in self.q_table.items():
-        #     if state_action[0] == state:
-        #         sum_prob += value
-        
-        # for state_action, value in self.q_table.items():
-        #     if state_action[0] == state:
-        #         if prob<(value/sum_prob):
-        #             prob = value
-        #             max_action = state_action[0] #es max_ation pero quiero que devuelva el estado
         
         for key, value in self.q_table.items():
             for sucessor in state.successors():
@@ -557,11 +568,14 @@ class QlearningAgent(BaseAgent):
                 hash_check_tuple = hashlib.md5(check_tuple.encode()).hexdigest()
                 if key == hash_check_tuple:
                     if prob < (value/sum_prob):
-                        prob = value
+                        prob = value/sum_prob
                         best = sucessor
+        
         if best is not None:
             return best
         else:
-            return None
+            mc_player = MCTSAgent(iterations=50)
+            return mc_player._next_state(state.game)
+            
             
     
