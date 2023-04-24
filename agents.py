@@ -129,7 +129,8 @@ class MinimaxAgent(BaseAgent):
         for successor in State(game).successors():
             value = max(
                 value,
-                self._min_value(successor.game, current_turn, alpha, beta, depth - 1),
+                self._min_value(successor.game, current_turn,
+                                alpha, beta, depth - 1),
             )
             alpha = max(alpha, value)
             if alpha >= beta:
@@ -138,7 +139,7 @@ class MinimaxAgent(BaseAgent):
         return value
 
     def _min_value(
-        self, 
+        self,
         game: MillGame,
         current_turn: Turn,
         alpha: int,
@@ -153,7 +154,8 @@ class MinimaxAgent(BaseAgent):
         for successor in State(game).successors():
             value = min(
                 value,
-                self._max_value(successor.game, current_turn, alpha, beta, depth - 1),
+                self._max_value(successor.game, current_turn,
+                                alpha, beta, depth - 1),
             )
             beta = min(beta, value)
             if alpha >= beta:
@@ -191,7 +193,8 @@ class MontecarloNode:
     parent: Optional[MontecarloNode] = None
     visits: int = 0
     accumulated_rewards: float = 0
-    expanded_children: list[MontecarloNode] = field(default_factory=list, init=False)
+    expanded_children: list[MontecarloNode] = field(
+        default_factory=list, init=False)
 
     def __post_init__(self):
         self._sucessors = self.state.successors(shuffle=True)
@@ -231,7 +234,8 @@ class MontecarloNode:
         if self.parent is None:
             raise ValueError("You can not get the evaluation of the root")
 
-        bound = 2 * cp * (2 * math.log(self.parent.visits) / self.visits) ** 0.5
+        bound = 2 * cp * (2 * math.log(self.parent.visits) /
+                          self.visits) ** 0.5
         return self.avg_reward() + bound
 
     def get_best_child(self, cp: float) -> MontecarloNode:
@@ -264,12 +268,13 @@ class _SimulationExecutor:
         self._executor = ProcessPoolExecutor()
 
     def run_simulation(self,
-            simulation: Callable[[MillGame, Turn], float],
-            game: MillGame,
-            turn: Turn) -> list[float]:
+                       simulation: Callable[[MillGame, Turn], float],
+                       game: MillGame,
+                       turn: Turn) -> list[float]:
         """ Run 'runs' simulations in parallel """
 
-        futures = [self._executor.submit(simulation, game, turn) for _ in range(self._runs)]
+        futures = [self._executor.submit(
+            simulation, game, turn) for _ in range(self._runs)]
         rewards = [future.result() for future in futures]
         return rewards
 
@@ -307,7 +312,7 @@ class MonteCarloTree:
 
         return max(self.root.expanded_children, key=MontecarloNode.avg_reward)
 
-    def run_iteration(self, cp: float, executor: Optional[_SimulationExecutor]=None):
+    def run_iteration(self, cp: float, executor: Optional[_SimulationExecutor] = None):
         """Run the sequence of steps required by the Montecarlo search
         algorithm to add a node to the tree.
 
@@ -328,16 +333,17 @@ class MonteCarloTree:
         # process because of IPC overhead
         if executor is not None and executor.runs > 1:
             # A copy is not needed here because all the data needed to run a simulation is cloned so that
-            # the process can use it and that includes the MillGame 
-            rewards = executor.run_simulation(self.default_policy, selected_game, self.current_turn)
+            # the process can use it and that includes the MillGame
+            rewards = executor.run_simulation(
+                self.default_policy, selected_game, self.current_turn)
             reward = sum(rewards)
             visited = executor.runs
         else:
-            reward = self.default_policy(copy.deepcopy(selected_game), self.current_turn)
+            reward = self.default_policy(
+                copy.deepcopy(selected_game), self.current_turn)
             visited = 1
 
         self.backup(selected_node, reward, visited)
-
 
     def tree_policy(self, cp: float) -> MontecarloNode:
         """Selects the node which is going to be expanded."""
@@ -348,7 +354,6 @@ class MonteCarloTree:
             current_node = current_node.get_best_child(cp)
 
         return current_node
-
 
     @staticmethod
     def default_policy(game: MillGame, current_turn: Turn):
@@ -379,7 +384,7 @@ class MCTSAgent(BaseAgent):
     """This algorithm chooses a move according to the Monte Carlo Tree Search
     algorithm."""
 
-    def __init__(self, iterations: int, runs: int=1, cp: Optional[int]=None):
+    def __init__(self, iterations: int, runs: int = 1, cp: Optional[int] = None):
         """iterations are the number of iterations the algorithm is going to
         run.
 
@@ -460,40 +465,88 @@ class HybridAgent(BaseAgent):
             return self.mcts_agent._next_state(game)
         return self.minimax_agent._next_state(game)
 
+
+def _to_md5(s: str) -> str:
+    return hashlib.md5(s.encode()).hexdigest()
+
+class QTable:
+    """ This is the table where the rewards for a given state-action pair are given """
+
+    def __init__(self):
+        self._table: dict[str, dict[str, float]] = {}
+
+    def get_reward(self, state: State, move: Move) -> Optional[float]:
+        """ Returns the reward for the given state-move pair """ 
+
+        state_key, move_key = self._get_keys(state, move)
+        if (reward_table := self._table.get(state_key)) is not None and (reward := reward_table.get(move_key)) is not None:
+            return reward
+
+        return None
+
+    def update_reward(
+            self,
+            state: State,
+            move: Move,
+            reward: float,
+            max_value: float,
+            lr: float,
+            df: float
+        ):
+
+        """ Updates the reward according to the value-iteration algorithm """
+
+        # Get the stored reward 
+        current_reward = self.get_reward(state, move)
+        current_reward = 0 if current_reward is None else current_reward
+
+        # Calcuate the value
+        value = current_reward + lr * (reward + df * max_value - current_reward)
+
+        # Store the new value
+        state_key, move_key = self._get_keys(state, move)
+
+
+    def _get_keys(self, state: State, move: Move):
+        state_key = str(state.game_info) + str(state.game.turn)
+        move_key = str(move)
+        return state_key, move_key
+
+
 class QlearningAgent(BaseAgent):
     """This algorithm chooses a move according to the values it had learned 
     by applying q-learning through a dynamic programming algorithm"""
 
-    def __init__(self, num_episodes: int = 5, learning_factor: float=0.1, discount_factor: float=0.9):
+    def __init__(self, num_episodes: int = 5, learning_factor: float = 0.1, discount_factor: float = 0.9):
         self.num_episodes = num_episodes
         self.learning_factor = learning_factor
         self.discount_factor = discount_factor
         self.curiosity_factor = 0.2
         self.q_table = {}
 
-    def calculate_reward(self, initial_turn:Turn, next_state:State) -> int: 
+    def calculate_reward(self, initial_turn: Turn, next_state: State) -> int:
         """Obtain the reward for this state based on whether it is terminal or if 
         it gets any mills."""
         reward = 0
-        #Check if the state is terminal
+        # Check if the state is terminal
         if next_state.game.mode == GameMode.FINISHED:
             if next_state.game.winner == initial_turn:
-                reward+= 100
+                reward += 100
             else:
-                reward+= -100
+                reward += -100
         else:
-            reward+= -1
+            reward += -1
 
-        #Check if there is a mill
-        if next_state.move.kill is not None: 
+        # Check if there is a mill
+        if next_state.move.kill is not None:
             if next_state.game.turn == initial_turn:
                 reward += 30
             else:
                 reward += -30
-        
-        return reward                    
 
-    def max_qvalue(self, state:State) -> float: 
+        return reward
+
+    def max_qvalue(self, state: State) -> float:
         """Obtain the maximum Q value for this state based on all possible actions."""
         best = None
         all_states = list(state.successors())
@@ -501,7 +554,8 @@ class QlearningAgent(BaseAgent):
         for key, value in self.q_table.items():
             for sucessor in all_states:
                 check_tuple = str(state) + str(sucessor.move)
-                hash_check_tuple = hashlib.md5(check_tuple.encode()).hexdigest()
+                hash_check_tuple = hashlib.md5(
+                    check_tuple.encode()).hexdigest()
                 if key == hash_check_tuple:
                     if best is None or value > best:
                         best = value
@@ -509,7 +563,6 @@ class QlearningAgent(BaseAgent):
             best = 0
 
         return best
-
 
     def train(self, game: MillGame) -> Optional[State]:
         """Loads the content of the json file and stores it in the q_table 
@@ -523,62 +576,62 @@ class QlearningAgent(BaseAgent):
             self.q_table = {}
 
         for _ in range(self.num_episodes):
-            state = next(State(game).successors(shuffle=True)) 
+            state = next(State(game).successors(shuffle=True))
             initial_turn = state.game.turn
             while state.game.mode != GameMode.FINISHED:
                 # prob = random.random()
                 # if prob < self.curiosity_factor:
-                #     next_state = next(state.successors(shuffle=True)) 
+                #     next_state = next(state.successors(shuffle=True))
                 # else:
                 #     mc_player = MCTSAgent(iterations=50)
                 #     next_state = mc_player._next_state(state.game)
-                next_state = next(state.successors(shuffle=True)) 
-             
+                next_state = next(state.successors(shuffle=True))
+
                 key = str(state) + str(next_state.move)
                 hash_key = hashlib.md5(key.encode()).hexdigest()
 
                 self.q_table[hash_key] = 0
                 value = self.q_table[hash_key] + self.learning_factor * \
-                        (self.calculate_reward(initial_turn, next_state) + \
-                        self.discount_factor * self.max_qvalue(next_state) - \
-                        self.q_table[hash_key]) 
+                    (self.calculate_reward(initial_turn, next_state) +
+                     self.discount_factor * self.max_qvalue(next_state) -
+                     self.q_table[hash_key])
                 self.q_table[hash_key] = value
-                
+
                 state = next_state
-            print("termina episodio")    
-                
+            print("termina episodio")
+
         with open("q_table.json", "w") as json_file:
             json.dump(self.q_table, json_file, indent=1)
 
     def _next_state(self, game: MillGame) -> Optional[State]:
         """Returns the next state of the game chosen by this algorithm."""
-        #TODO: cargar q_table
+        # TODO: cargar q_table
         state = State(game)
         best = None
         sum_prob = 0
         prob = 0
-        
+
         for key, value in self.q_table.items():
             for sucessor in state.successors():
                 check_tuple = str(state) + str(sucessor.move)
-                hash_check_tuple = hashlib.md5(check_tuple.encode()).hexdigest()
+                hash_check_tuple = hashlib.md5(
+                    check_tuple.encode()).hexdigest()
                 if key == hash_check_tuple:
                     sum_prob += value
 
         for key, value in self.q_table.items():
             for sucessor in state.successors():
                 check_tuple = str(state) + str(sucessor.move)
-                hash_check_tuple = hashlib.md5(check_tuple.encode()).hexdigest()
+                hash_check_tuple = hashlib.md5(
+                    check_tuple.encode()).hexdigest()
                 if key == hash_check_tuple:
                     if prob < (value/sum_prob):
                         prob = value/sum_prob
                         best = sucessor
-        
+
         if best is not None:
             return best
         else:
             mc_player = MCTSAgent(iterations=50)
             return mc_player._next_state(state.game)
-            
-            
-    
+

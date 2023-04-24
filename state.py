@@ -3,7 +3,7 @@ from __future__ import annotations
 import copy
 import random
 
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 from collections.abc import Iterator
 from game import (
     GameMode,
@@ -11,6 +11,9 @@ from game import (
     Move,
 )
 from mill_game_exceptions import MillGameException
+
+if TYPE_CHECKING:
+    from game import GameInfo, Turn
 
 
 class State:
@@ -23,11 +26,11 @@ class State:
         self.game = game
         self.move = move
         self.parent = parent
-        game_info = self.game.get_current_game_info()
+        self.game_info = self.game.get_current_game_info()
 
-        self.free_pieces = game_info.free_pieces
+        self.free_pieces = self.game_info.free_pieces
 
-        self.players = [game_info.white_player_pieces, game_info.black_player_pieces]
+        self.players = [self.game_info.white_player_pieces, self.game_info.black_player_pieces]
 
     def _generate_place_sucessors(self) -> Iterator[State]:
         oponent_turn = 1 - self.game.turn.value
@@ -115,6 +118,15 @@ class State:
         random.shuffle(white_pieces)
         random.shuffle(black_pieces)
 
+    def __eq__(self, obj: object) -> bool:
+        if not isinstance(obj, State):
+            return False
+
+        return obj.__key == self.__key
+
+    def __hash__(self) -> int:
+        return hash(self.__key)
+
     def __str__(self):
         joined_free = ",".join(
             map(str, [ring * 8 + cell for ring, cell in self.free_pieces])
@@ -131,3 +143,6 @@ class State:
             f"'CHIPS':[{self.game.players[0].remaining_pieces}, "
             f"{self.game.players[1].remaining_pieces}]}}"
         )
+
+    def __key(self) -> tuple[GameInfo, Turn]:
+        return (self.game_info, self.game.turn)
