@@ -464,7 +464,7 @@ class QlearningAgent(BaseAgent):
     """This algorithm chooses a move according to the values it had learned 
     by applying q-learning through a dynamic programming algorithm"""
 
-    def __init__(self, num_episodes: int = 1, learning_factor: float=0.1, discount_factor: float=0.9):
+    def __init__(self, num_episodes: int = 5, learning_factor: float=0.1, discount_factor: float=0.9):
         self.num_episodes = num_episodes
         self.learning_factor = learning_factor
         self.discount_factor = discount_factor
@@ -496,9 +496,10 @@ class QlearningAgent(BaseAgent):
     def max_qvalue(self, state:State) -> float: 
         """Obtain the maximum Q value for this state based on all possible actions."""
         best = None
+        all_states = list(state.successors())
 
         for key, value in self.q_table.items():
-            for sucessor in state.successors():
+            for sucessor in all_states:
                 check_tuple = str(state) + str(sucessor.move)
                 hash_check_tuple = hashlib.md5(check_tuple.encode()).hexdigest()
                 if key == hash_check_tuple:
@@ -516,7 +517,7 @@ class QlearningAgent(BaseAgent):
         with their corresponding value of the q-value formula. This represents 
         the knowledge of our agent """
         try:
-            with open('prueba.json', 'r') as f:
+            with open('q_table.json', 'r') as f:
                 self.q_table = json.load(f)
         except FileNotFoundError:
             self.q_table = {}
@@ -525,12 +526,13 @@ class QlearningAgent(BaseAgent):
             state = next(State(game).successors(shuffle=True)) 
             initial_turn = state.game.turn
             while state.game.mode != GameMode.FINISHED:
-                prob = random.random()
-                if prob < self.curiosity_factor:
-                    next_state = next(state.successors(shuffle=True)) 
-                else:
-                    mc_player = MCTSAgent(iterations=50)
-                    next_state = mc_player._next_state(state.game)
+                # prob = random.random()
+                # if prob < self.curiosity_factor:
+                #     next_state = next(state.successors(shuffle=True)) 
+                # else:
+                #     mc_player = MCTSAgent(iterations=50)
+                #     next_state = mc_player._next_state(state.game)
+                next_state = next(state.successors(shuffle=True)) 
              
                 key = str(state) + str(next_state.move)
                 hash_key = hashlib.md5(key.encode()).hexdigest()
@@ -543,8 +545,9 @@ class QlearningAgent(BaseAgent):
                 self.q_table[hash_key] = value
                 
                 state = next_state
+            print("termina episodio")    
                 
-        with open("prueba.json", "w") as json_file:
+        with open("q_table.json", "w") as json_file:
             json.dump(self.q_table, json_file, indent=1)
 
     def _next_state(self, game: MillGame) -> Optional[State]:
