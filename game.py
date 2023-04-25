@@ -110,9 +110,21 @@ class Move:
     def from_json(cls, json_str: str) -> Move:
         data = json.loads(json_str)
         return cls(
-            data["NEXT_POS"],
+            divmod(data["NEXT_POS"], 8),
             None if data["POS_INIT"] == -1 else divmod(data["POS_INIT"], 8),
             None if data["KILL"] == -1 else divmod(data["KILL"], 8),
+        )
+
+    @classmethod
+    def from_compressed(cls, compressed: int) -> Move:
+        next_pos = compressed >> 16 
+        pos_init = (compressed >> 8) & 0xFF
+        kill = compressed & 0xFF
+
+        return cls(
+                divmod(next_pos, 8),
+                None if pos_init == 0xFF else divmod(pos_init, 8),
+                None if kill == 0xFF else divmod(kill, 8)
         )
 
     def to_json(self) -> str:
@@ -126,12 +138,18 @@ class Move:
             }
         )
 
+    def to_compressed(self) -> int:
+        next_pos = self.next_pos[0] * 8 + self.next_pos[1]
+        pos_init = 0xFF if self.pos_init is None else self.pos_init[0] * 8 + self.pos_init[1]
+        kill = 0xFF if self.kill is None else self.kill[0] * 8 + self.kill[1]
+
+        return (next_pos << 16) + (pos_init << 8) + kill
+
     def __str__(self) -> str:
         return (
             f"<move>={{'POS_INIT':{self.pos_init}, "
             f"'NEXT_POS':{self.next_pos},'KILL':{self.kill}}}"
         )
-
 
 class MillGame:
     """Class which contains the game logic.

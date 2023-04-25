@@ -8,8 +8,6 @@ import math
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass, field
 from abc import ABC, abstractmethod
-import pickle
-import random
 from typing import TYPE_CHECKING, Callable, Optional
 
 from game import GameMode, Turn
@@ -473,7 +471,7 @@ class QTable:
     """ This is the table where the rewards for a given state-action pair are given """
 
     def __init__(self):
-        self._table: dict[str, dict[str, float]] = {}
+        self._table: dict[str, dict[int, float]] = {}
 
     def get_reward(self, state: State, move: Move) -> Optional[float]:
         """ Returns the reward for the given state-move pair """ 
@@ -484,33 +482,178 @@ class QTable:
 
         return None
 
-    def update_reward(
+    def apply_reward(
             self,
             state: State,
             move: Move,
             reward: float,
-            max_value: float,
+            max_reward: float,
             lr: float,
-            df: float
+            df: float,
+            initial_value: float=0
         ):
 
         """ Updates the reward according to the value-iteration algorithm """
 
-        # Get the stored reward 
+        # Get the stored reward. If it does not exist, set it to 0
         current_reward = self.get_reward(state, move)
-        current_reward = 0 if current_reward is None else current_reward
+        current_reward = initial_value if current_reward is None else current_reward
 
         # Calcuate the value
-        value = current_reward + lr * (reward + df * max_value - current_reward)
+        value = current_reward + lr * (reward + df * max_reward - current_reward)
 
         # Store the new value
         state_key, move_key = self._get_keys(state, move)
+        if state_key in self._table:
+            move_table = self._table[state_key]
+        else:
+            move_table: dict[int, float] = {}
+            self._table[state_key] = move_table
+
+        move_table[move_key] = value
+
+    def max_reward_move(self, state: State) -> Optional[tuple[float, Move]]:
+        """ Return the pair (reward, Move) with the highest reward for the given state. If
+        the state does not exist or it does not have any move stored in the table then 
+        None is returned """
+
+        state_key = self._get_state_key(state)
+        if (move_table := self._table.get(state_key)) is None:
+            return None
+
+        if len(move_table) == 0:
+            return None
+
+        all_pairs = [(reward, Move.from_compressed(compressed_move)) 
+                     for compressed_move, reward in move_table.items()]
+
+        return max(all_pairs, key=lambda pair : pair[0])
+
+    def best_move(self, state: State) -> Optional[Move]:
+        """ Return the best move for the given state according to what is stored in the q table """
+
+        if (reward_move := self.max_reward_move(state)) is None:
+            return None
+
+        return reward_move[1]
+
+    def max_reward(self, state: State) -> Optional[float]:
+        """ Return the best move for the given state according to what is stored in the q table """
+
+        if (reward_move := self.max_reward_move(state)) is None:
+            return None
+
+        return reward_move[0]
+
+    def save(self, file_name: str):
+        """ Saves the q table to the given file_name """
+        # TODO: it would be more pythonic if we use Path instead of a str for the filename
+
+        with open(file_name, "w") as json_file:
+            json.dump(self._table, json_file, indent=1)
+
+    def load(self, file_name: str):
+        """ Loads the q table from a file """
+
+        # TODO: it would be more pythonic if we use Path instead of a str for the filename
+        with open(file_name, 'r') as file:
+            self._table = json.load(file)
 
 
-    def _get_keys(self, state: State, move: Move):
-        state_key = str(state.game_info) + str(state.game.turn)
-        move_key = str(move)
-        return state_key, move_key
+    def _get_state_key(self, state: State) -> str:
+        remaining_players = (state.game.players[0].remaining_pieces, 
+                             state.game.players[1].remaining_pieces)
+
+        unique = str(state.game_info) + str(state.game.turn) + str(remaining_players)
+
+        return _to_md5(unique)
+
+    def _get_move_key(self, move: Move) -> int:
+        return move.to_compressed()
+
+    def _get_keys(self, state: State, move: Move) -> tuple[str, int]:
+        return self._get_state_key(state), self._get_move_key(move)
+
+def _default_reward_fn(state: State, initial_turn: Turn)
+    """ Obtain the reward for this state based on whether it is terminal or if 
+        it gets any mills of each move. """
+
+    reward = 0
+    # Check if the state is terminal
+    if state.game.mode == GameMode.FINISHED:
+        if state.game.winner == initial_turn:
+            reward += 100
+        else:
+            reward += -100
+    else:
+        reward += -1
+
+    # Check if there is a mill
+    if state.move is not None and state.move.kill is not None:
+        if state.game.turn == initial_turn:
+            reward += 30
+        else:
+            reward += -30
+
+    return reward
+
+class Trainer:
+
+    def __init__(self, 
+                 *,
+                 episodes: int,
+                 file_name: str,
+                 resume=True,
+                 lr: float=0.1,
+                 df: float=0.9,
+                 reward_fn: Optional[Callable[[State, Turn], float]]=None):
+        """ If 'resume' is true, it assumed that file_name already exists and the intention
+        is continue training with the results obtained in a previous training session. If
+        resume is True but file_name does not exist, then an empty q table is created but
+        the file is not saved until the training session has finished 
+
+        reward_fn is a function which calculates the reward given for a move.
+
+        NOTE: this will override file_name if it exists but resume is set to False """
+
+        # TODO: it would be more pythonic if we use Path instead of a str for a filename
+
+        self.q_table = QTable()
+
+        # TODO: again, Path is more modern approach
+        if resume and os.path.exists(self.file_name):
+            self.q_table.load(self.file_name)
+
+        self.file_name = file_name
+        self.episodes = episodes
+        self.lr = lr
+        self.df = df
+        self.reward_fn = _default_reward_fn if reward_fn is None else reward_fn
+
+        # This is necessary to perform the training
+        self._random_agent = RandomAgent()
+
+    def train(self, turn: Turn):
+        """ Train the agent by filling the q_table. Turn is the turn of the agent """
+
+        for _ in range(self.episodes):
+            state = State(MillGame(turn))
+            while state.game.mode != GameMode.FINISHED:
+                next_state = self._random_agent._next_state(state.game)
+                # The type error can be safely ignored because if the game is not finished
+                # then there will always be a move we can do
+                reward = self.reward_fn(next_state, turn) # type: ignore
+                max_reward = self.q_table.max_reward()
+
+                # The type error can be safely ignored because next_state is guaranteed to have a parent
+                self.q_table.apply_reward(
+                        state,
+                        next_state.move, # type: ignore
+                        reward=reward,
+                        max_reward=max_reward,
+                        lr=self.lr,
+                        df=self.df
+                )
 
 
 class QlearningAgent(BaseAgent):
@@ -519,14 +662,15 @@ class QlearningAgent(BaseAgent):
 
     def __init__(self, num_episodes: int = 5, learning_factor: float = 0.1, discount_factor: float = 0.9):
         self.num_episodes = num_episodes
-        self.learning_factor = learning_factor
+        self.learning_factor = learning_factor 
         self.discount_factor = discount_factor
         self.curiosity_factor = 0.2
         self.q_table = {}
 
     def calculate_reward(self, initial_turn: Turn, next_state: State) -> int:
-        """Obtain the reward for this state based on whether it is terminal or if 
-        it gets any mills."""
+        """ Obtain the reward for this state based on whether it is terminal or if 
+        it gets any mills. """
+
         reward = 0
         # Check if the state is terminal
         if next_state.game.mode == GameMode.FINISHED:
@@ -565,6 +709,7 @@ class QlearningAgent(BaseAgent):
         return best
 
     def train(self, game: MillGame) -> Optional[State]:
+
         """Loads the content of the json file and stores it in the q_table 
         dictionary. This dictionary will be updated with new state-action pairs 
         with their corresponding value of the q-value formula. This represents 
