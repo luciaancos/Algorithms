@@ -28,9 +28,9 @@ class State:
         self.parent = parent
         self.game_info = self.game.get_current_game_info()
 
-        self.free_pieces = self.game_info.free_pieces
+        self.free_pieces = self.game_info.free_pieces[:]
 
-        self.players = [self.game_info.white_player_pieces, self.game_info.black_player_pieces]
+        self.players = [self.game_info.white_player_pieces[:], self.game_info.black_player_pieces[:]]
 
     def _generate_place_sucessors(self) -> Iterator[State]:
         oponent_turn = 1 - self.game.turn.value

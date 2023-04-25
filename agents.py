@@ -5,16 +5,14 @@ import json
 import os
 import copy
 import math
+import random
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass, field
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Callable, Optional
+from typing import Callable, Optional, cast
 
-from game import GameMode, Turn
+from game import GameMode, Turn, MillGame, Move
 from state import State
-
-if TYPE_CHECKING:
-    from game import Move, MillGame
 
 
 class BaseAgent(ABC):
@@ -471,7 +469,7 @@ class QTable:
     """ This is the table where the rewards for a given state-action pair are given """
 
     def __init__(self):
-        self._table: dict[str, dict[int, float]] = {}
+        self._table: dict[str, dict[str, float]] = {}
 
     def get_reward(self, state: State, move: Move) -> Optional[float]:
         """ Returns the reward for the given state-move pair """ 
@@ -495,7 +493,7 @@ class QTable:
 
         """ Updates the reward according to the value-iteration algorithm """
 
-        # Get the stored reward. If it does not exist, set it to 0
+        # Get the stored reward. If it does not exist, set it to 0 by default
         current_reward = self.get_reward(state, move)
         current_reward = initial_value if current_reward is None else current_reward
 
@@ -507,7 +505,7 @@ class QTable:
         if state_key in self._table:
             move_table = self._table[state_key]
         else:
-            move_table: dict[int, float] = {}
+            move_table: dict[str, float] = {}
             self._table[state_key] = move_table
 
         move_table[move_key] = value
@@ -524,7 +522,7 @@ class QTable:
         if len(move_table) == 0:
             return None
 
-        all_pairs = [(reward, Move.from_compressed(compressed_move)) 
+        all_pairs = [(reward, Move.from_compressed(int(compressed_move))) 
                      for compressed_move, reward in move_table.items()]
 
         return max(all_pairs, key=lambda pair : pair[0])
@@ -568,13 +566,13 @@ class QTable:
 
         return _to_md5(unique)
 
-    def _get_move_key(self, move: Move) -> int:
-        return move.to_compressed()
+    def _get_move_key(self, move: Move) -> str:
+        return str(move.to_compressed())
 
-    def _get_keys(self, state: State, move: Move) -> tuple[str, int]:
+    def _get_keys(self, state: State, move: Move) -> tuple[str, str]:
         return self._get_state_key(state), self._get_move_key(move)
 
-def _default_reward_fn(state: State, initial_turn: Turn)
+def _default_reward_fn(state: State, initial_turn: Turn):
     """ Obtain the reward for this state based on whether it is terminal or if 
         it gets any mills of each move. """
 
@@ -590,7 +588,7 @@ def _default_reward_fn(state: State, initial_turn: Turn)
 
     # Check if there is a mill
     if state.move is not None and state.move.kill is not None:
-        if state.game.turn == initial_turn:
+        if state.game.turn != initial_turn:
             reward += 30
         else:
             reward += -30
@@ -606,6 +604,7 @@ class Trainer:
                  resume=True,
                  lr: float=0.1,
                  df: float=0.9,
+                 gamma: float=0,
                  reward_fn: Optional[Callable[[State, Turn], float]]=None):
         """ If 'resume' is true, it assumed that file_name already exists and the intention
         is continue training with the results obtained in a previous training session. If
@@ -613,6 +612,7 @@ class Trainer:
         the file is not saved until the training session has finished 
 
         reward_fn is a function which calculates the reward given for a move.
+        gamma denotes how often a montecarlo agent will be used
 
         NOTE: this will override file_name if it exists but resume is set to False """
 
@@ -620,40 +620,81 @@ class Trainer:
 
         self.q_table = QTable()
 
-        # TODO: again, Path is more modern approach
-        if resume and os.path.exists(self.file_name):
-            self.q_table.load(self.file_name)
-
         self.file_name = file_name
         self.episodes = episodes
         self.lr = lr
         self.df = df
         self.reward_fn = _default_reward_fn if reward_fn is None else reward_fn
+        self.gamma = gamma
 
         # This is necessary to perform the training
         self._random_agent = RandomAgent()
 
-    def train(self, turn: Turn):
+        # FIXME: this is not the best approach for exploration
+        # FIXME: should this agent be given as an argument?
+        self._mcts_agent = MCTSAgent(iterations=50)
+
+        # Load the q_table if appropiate
+        if resume and os.path.exists(self.file_name):
+            self.q_table.load(self.file_name)
+
+    def train(self, turn: Turn, max_moves: int=150, verbose=False):
         """ Train the agent by filling the q_table. Turn is the turn of the agent """
 
-        for _ in range(self.episodes):
-            state = State(MillGame(turn))
-            while state.game.mode != GameMode.FINISHED:
-                next_state = self._random_agent._next_state(state.game)
-                # The type error can be safely ignored because if the game is not finished
-                # then there will always be a move we can do
-                reward = self.reward_fn(next_state, turn) # type: ignore
-                max_reward = self.q_table.max_reward()
+        for i in range(self.episodes):
+            state = State(MillGame(turn=turn, max_movements=max_moves))
+            self._run_episode(state)
+            if verbose:
+                print(f"Finished episode #{i + 1}")
 
-                # The type error can be safely ignored because next_state is guaranteed to have a parent
-                self.q_table.apply_reward(
-                        state,
-                        next_state.move, # type: ignore
-                        reward=reward,
-                        max_reward=max_reward,
-                        lr=self.lr,
-                        df=self.df
-                )
+    def save_results(self):
+        self.q_table.save(self.file_name)
+
+    def _run_episode(self, state: State):
+        initial_turn = state.game.turn
+
+        while state.game.mode != GameMode.FINISHED:
+            if random.random() < self.gamma:
+                next_state = cast(State, self._mcts_agent._next_state(state.game))
+            else:
+                next_state = cast(State, self._random_agent._next_state(state.game))
+
+            reward = self.reward_fn(next_state, initial_turn)
+            if (max_reward := self.q_table.max_reward(next_state)) is None:
+                max_reward = 0
+
+            self.q_table.apply_reward(
+                    state,
+                    next_state.move, # type: ignore
+                    reward=reward,
+                    max_reward=max_reward,
+                    lr=self.lr,
+                    df=self.df
+            )
+            state = next_state
+
+class QAgent(BaseAgent):
+    """This algorithm chooses a move according to the values it had learned 
+    by applying q-learning algorithm"""
+
+    def __init__(self, q_table: QTable, alternative_agent: Optional[BaseAgent]=None):
+        """ Alternative agent is the agent which is going to perform the move in case the state is not found """
+
+        self.q_table = q_table
+        self.alternative_agent = MCTSAgent(iterations=50) if alternative_agent is None else alternative_agent
+
+    def _next_state(self, game: MillGame) -> Optional[State]:
+        if game.mode == GameMode.FINISHED:
+            return None
+
+        state = State(game)
+        move = self.q_table.best_move(state)
+        if move is None:
+            return self.alternative_agent._next_state(game)
+        else:
+            game_copy = copy.deepcopy(game)
+            game_copy.apply_move(move)
+            return State(game_copy, move, state)
 
 
 class QlearningAgent(BaseAgent):
