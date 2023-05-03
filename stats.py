@@ -65,6 +65,7 @@ def gather_statistics(agent_combinations: List[tuple[BaseAgent, BaseAgent]],
                 continue
             agent1_wins = results[key]["agent1_wins"]
             agent2_wins = results[key]["agent2_wins"]
+            draws = results[key]["agent2_wins"]
             total_time_agent1 = results[key]["mean_time_agent1"] * total_plays
             total_time_agent2 = results[key]["mean_time_agent2"] * total_plays
 
