@@ -9,7 +9,7 @@ import random
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass, field
 from abc import ABC, abstractmethod
-from typing import Callable, Optional, cast
+from typing import Callable, Optional, cast, List, Any
 
 from game import GameMode, Turn, MillGame, Move
 from state import State
@@ -605,7 +605,8 @@ class Trainer:
                  lr: float=0.1,
                  df: float=0.9,
                  gamma: float=0,
-                 reward_fn: Optional[Callable[[State, Turn], float]]=None):
+                 reward_fn: Optional[Callable[[State, Turn], float]]=None,
+                 reward_fn_args: Optional[List[Any]]=None):
         """ If 'resume' is true, it assumed that file_name already exists and the intention
         is continue training with the results obtained in a previous training session. If
         resume is True but file_name does not exist, then an empty q table is created but
@@ -625,6 +626,7 @@ class Trainer:
         self.lr = lr
         self.df = df
         self.reward_fn = _default_reward_fn if reward_fn is None else reward_fn
+        self.reward_fn_args = reward_fn_args
         self.gamma = gamma
 
         # This is necessary to perform the training
@@ -659,6 +661,11 @@ class Trainer:
             else:
                 next_state = cast(State, self._random_agent._next_state(state.game))
 
+            if self.reward_fn_args is not None:
+                reward = self.reward_fn(state, initial_turn, *self.reward_fn_args)
+            else:
+                reward = self.reward_fn(state, initial_turn)
+            
             reward = self.reward_fn(next_state, initial_turn)
             if (max_reward := self.q_table.max_reward(next_state)) is None:
                 max_reward = 0
