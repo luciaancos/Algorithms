@@ -45,9 +45,10 @@ class GameServer:
                 if msg.is_game_message():
                     await game.forward_msg(msg, player)
                     if game.has_finished():
+                        # Delete the game where this player was playing
+                        self.game_manager.delete_game(player)
                         # TODO: save the state in the database or do whatever
                         # is needed after a game has finished
-                        pass
                 else:
                     await player.socket.send_msg(
                         Message(

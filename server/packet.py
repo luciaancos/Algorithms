@@ -49,7 +49,11 @@ class MessageType(Enum):
     GAME_OK = 5
     MOVE = 6
     INVALID_STATE = 7
+
+    # In the JSON, there must be a boolean attribute called "is_tie", which must be true
+    # if the game have finished because a tie has been reached
     FINNISH = 8
+    STATS = 9
 
 
 @dataclass
@@ -69,7 +73,7 @@ class Message:
         """Return true if this is a message type that should be exchange
         when a player is in a game"""
 
-        return self.msg_type.value >= 6 and self.msg_type.value <= 8
+        return self.msg_type.value >= 6 and self.msg_type.value <= 9
 
     @property
     def payload(self) -> dict[Any, Any]:

@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Optional
 import secrets
 import random
 import logging
+import asyncio
 
 from packet import Message, MessageType
 
@@ -64,6 +65,10 @@ class Game:
                 first_player if self.white_player is second_player else second_player
             )
 
+        # This lock is needed 
+        self.lock = asyncio.Lock()
+        self._cnts = [0, 0]
+
     async def send_initial_msg(self):
         """Sends the initial message to both players"""
 
@@ -97,29 +102,41 @@ class Game:
         if not self.is_playing(player):
             raise ValueError(f"{player.socket.peername} is not playing in the game")
 
+        async with self.lock:
+            await self._handle_forward_message(msg, player)
+
+
+    async def _handle_forward_message(self, msg: Message, player: Player):
+        """ This method must be executed in mutual exclusion. Otherwise, the invariants that have to hold
+        for the counters won't do it """
         if not self._is_turn(player):
             await player.socket.send_msg(
                 Message(
                     MessageType.ERROR,
                     {
                         "msg": "It is not your turn. Wait until the other player performs a move "
-                        ""
                     },
                 )
             )
             return
 
-        # TODO: a lock is needed. If the same player sends two messages, then
-        # it might be possible that both of them enter here, when it shouldn't
+        if self.has_finished():
+            await player.socket.send_msg(
+                    Message(
+                        MessageType.ERROR, 
+                        {"msg": "The game has already finished and will be soon be deleted"}
+                    )
+                )
+
         opponent_player = self._opponent_player(player)
 
         match msg.msg_type:
             case MessageType.MOVE:
                 self._finished_cnt = 0
-                self._errors_cnt = 0
+                self._cnts[self._turn] = 0
             case MessageType.INVALID_STATE:
                 self._finished_cnt = 0
-                self._errors_cnt += 1
+                self._cnts[self._turn] += 1
             case MessageType.FINNISH:
                 self._finished_cnt += 1
                 self._change_turn()
@@ -129,19 +146,34 @@ class Game:
             await opponent_player.socket.send_msg(msg)
             self._change_turn()
         else:
-            # If the game has finished because two consecutive FINNISH messages have been sent, then
-            # the winner is opponent_player
+            if not self.max_errors_reached():
+                # Then this is the second consecutive FINNISH
+                # TODO: change this
+                if msg.payload["is_tie"]:
+                    turn_value = -1
+                else:
+                    # If it is not tie, the winner is the first one who sent the message
+                    turn_value = 1 - self._turn
 
-            # TODO: send a message to both players indicating that the game has finished
-            # with some statistics
-            pass
+                await player.socket.send_msg(Message(MessageType.STATS, {
+                    "type": "game_result",
+                    "winner": turn_value
+                }))
+            else:
+                await player.socket.send_msg(Message(MessageType.STATS, {
+                    "type": "max_error_reached"
+                }))
 
-    def has_finished(self) -> bool:
+    def has_finished(self) -> bool: 
         """Returns true if this game has finished"""
 
         return (
-            self._finished_cnt == 2 or self._errors_cnt == self.max_consecutive_errors
+            self._finished_cnt == 2 or self.max_errors_reached()
         )
+
+    def max_errors_reached(self) -> bool:
+        return (self._cnts[0] == self.max_consecutive_errors or 
+                    self._cnts[1] == self.max_consecutive_errors)
 
     def is_playing(self, player: Player) -> bool:
         """Returns true if the given player is playing in this game"""
